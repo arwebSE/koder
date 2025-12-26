@@ -4,7 +4,7 @@ This file provides guidance to AI agents when working with the koder repository.
 
 ## Project Overview
 
-This is a mobile web wrapper for Claude Code CLI deployed as part of the homelab infrastructure. The application provides a chat interface with predefined path selection for interacting with Claude Code.
+This is a mobile web wrapper for AI CLI tools deployed as part of the homelab infrastructure. The application provides a chat interface with predefined path selection for interacting with either Claude Code or opencode, with provider toggle functionality.
 
 ## Deployment Instructions
 
@@ -32,24 +32,34 @@ jobs:
 ### Manual Deployment (if needed)
 
 ```bash
-# Copy files to server
-scp . mi@buntubox:~/docker/stacks/koder/
+# Using just commands (recommended)
+just deploy
+just deploy-code
 
-# Deploy container
-ssh mi@buntubox "cd ~/docker/stacks/kod && docker compose -f kod.yml up -d --build"
+# Or manual commands
+scp . mi@buntubox:~/docker/stacks/koder/
+ssh mi@buntubox "cd ~/docker/stacks/koder && docker compose -f kod.yml up -d --build"
 ```
 
 ## Repository Structure
 
 ```
 koder/
-├── public/
-│   └── index.html          # Frontend HTML/CSS/JS
+├── frontend/
+│   ├── src/                # React source code
+│   │   ├── App.jsx         # Main React component
+│   │   ├── App.css         # Component styles
+│   │   ├── main.jsx        # React entry point
+│   │   └── index.css       # Global styles
+│   ├── package.json        # Frontend dependencies
+│   ├── vite.config.js      # Vite configuration
+│   └── index.html         # HTML template
 ├── server/
-│   └── app.js              # Express.js backend
+│   └── app.py              # Python FastAPI backend
 ├── kod.yml         # Docker Compose configuration
-├── Dockerfile              # Container build instructions
-├── package.json            # Node.js dependencies
+├── Dockerfile              # Multi-stage build (React + Python)
+├── pyproject.toml          # Python dependencies with uv
+├── justfile                # Task runner commands
 ├── .github/workflows/
 │   └── deploy.yml          # GitHub Actions workflow
 ├── README.md               # Project documentation
@@ -58,17 +68,24 @@ koder/
 
 ## Key Files and Their Purpose
 
-### Frontend (`public/index.html`)
+### Frontend (`frontend/src/`)
+- React SPA with modern component architecture
 - Mobile-first responsive chat interface
+- AI provider toggle (Claude Code vs opencode)
 - Path selection dropdown for predefined directories
 - WebSocket-like real-time messaging
 - Session management with UUID tracking
+- Provider-specific visual indicators for responses
+- Hot reload development with Vite
 
-### Backend (`server/app.js`)
-- Express.js server executing Claude CLI commands
-- Session management with 30-minute timeout
+### Backend (`server/app.py`)
+- Python FastAPI server executing AI CLI commands (Claude Code or opencode)
+- Async support for better concurrency and performance
+- Session management with 30-minute timeout per provider
 - File system access with security constraints
-- API endpoints for chat and session control
+- Automatic API documentation at `/docs` endpoint
+- Request/response validation with Pydantic models
+- Provider-aware session isolation
 
 ### Deployment (`kod.yml`)
 - Docker Compose configuration
@@ -85,9 +102,11 @@ Paths are hardcoded in `public/index.html`:
 - `/Users/Pc/repos/koder`
 
 ### Docker Configuration
-- Runs as non-root user (nodejs:1001)
+- Runs as non-root user (python:1001)
+- Uses Python 3.11 with uv for dependency management
 - Exposes port 3000 internally
 - Connects to `public_net` network for NPM proxying
+- Installs both Claude CLI and opencode in container
 
 ## Testing
 
@@ -95,7 +114,12 @@ After deployment, verify:
 1. **Web interface** loads at `https://kod.arweb.dev`
 2. **Path selection** works correctly
 3. **Chat interface** responds to messages
-4. **Claude CLI** executes commands properly
+4. **API documentation** is accessible at `https://kod.arweb.dev/docs`
+5. **Claude CLI** executes commands properly
+6. **opencode** executes commands properly
+7. **AI provider toggle** switches between providers correctly
+8. **Mobile responsiveness** on different screen sizes
+9. **Session isolation** works between providers
 5. **Mobile responsiveness** on different screen sizes
 
 ## Security Considerations
@@ -145,10 +169,12 @@ ssh mi@buntubox "which claude"
 
 ### When Making Changes
 
-1. **Frontend changes**: Update `public/index.html` and test mobile responsiveness
-2. **Backend changes**: Update `server/app.js` and test API endpoints
+1. **Frontend changes**: Update React components in `frontend/src/` and test mobile responsiveness
+2. **Backend changes**: Update `server/app.py` and test API endpoints at `/docs`
 3. **Deployment changes**: Update `kod.yml` or `Dockerfile`
-4. **New dependencies**: Add to `package.json` and rebuild container
+4. **New Python dependencies**: Add to `pyproject.toml` and rebuild container
+5. **New frontend dependencies**: Add to `frontend/package.json` and rebuild frontend
+6. **API changes**: Test with FastAPI auto-docs at `http://localhost:3000/docs`
 
 ### Commit and Deploy Workflow
 

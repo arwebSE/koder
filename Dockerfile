@@ -1,25 +1,40 @@
-FROM node:18-alpine
+# Multi-stage build
+FROM node:18-alpine AS frontend-builder
+
+WORKDIR /app/frontend
+COPY frontend/package*.json ./
+RUN npm ci
+COPY frontend/ .
+RUN npm run build
+
+# Python backend stage
+FROM python:3.11-alpine
+
+# Install uv for package management
+RUN pip install uv
 
 WORKDIR /app
 
-# Copy package files
-COPY package*.json ./
+# Copy server dependencies and install them
+COPY server/pyproject.toml ./
+RUN uv pip install --system
 
-# Install dependencies
-RUN npm install --production
+# Install opencode CLI tool
+RUN pip install opencode
 
 # Copy application code
-COPY . .
+COPY server/ ./server/
+COPY --from=frontend-builder /app/frontend/dist ./static/
 
 # Create non-root user
-RUN addgroup -g 1001 -S nodejs
-RUN adduser -S nodejs -u 1001
+RUN addgroup -g 1001 -S python
+RUN adduser -S python -u 1001
 
 # Change ownership of the app directory
-RUN chown -R nodejs:nodejs /app
+RUN chown -R python:python /app
 
-USER nodejs
+USER python
 
 EXPOSE 3000
 
-CMD ["npm", "start"]
+CMD ["uv", "run", "uvicorn", "server.app:app", "--host", "0.0.0.0", "--port", "3000"]

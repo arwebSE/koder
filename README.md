@@ -8,31 +8,46 @@ This is a minimal web application that acts as a wrapper for the Claude Code CLI
 
 ## Features
 
+- **React-based SPA** with modern component architecture
 - **Mobile-first responsive design** optimized for touch interaction
+- **AI Provider Toggle**: Switch between Claude Code and opencode
 - **Predefined path selection** for quick directory switching
-- **Session management** with UUID tracking
+- **Session management** with UUID tracking per AI provider
 - **Real-time chat interface** with typing indicators
 - **Code block formatting** with syntax highlighting
+- **Provider-specific visual indicators** for responses
+- **Hot reload development** with Vite dev server
 - **Secure deployment** via public network with SSL
 
 ## Architecture
 
-- **Frontend**: Vanilla HTML/CSS/JavaScript with mobile-first design
-- **Backend**: Express.js server executing Claude CLI commands
-- **Deployment**: Docker containerized with Nginx Proxy Manager
+- **Frontend**: React + Vite with mobile-first responsive design
+- **Backend**: Python FastAPI server executing AI CLI commands (Claude Code or opencode)
+- **Async Support**: Non-blocking I/O for better concurrency
+- **Package Management**: uv for Python, npm for frontend
+- **Task Runner**: Just for shorthand commands
+- **API Documentation**: Auto-generated at `/docs` endpoint
+- **Deployment**: Multi-stage Docker build for production optimization
 - **Session Storage**: In-memory session management with 30-minute timeout
 
 ## Development
 
 ```bash
+# Install just (if not already installed)
+# macOS: brew install just
+# Linux: cargo install just
+
 # Install dependencies
-npm install
+just install
 
 # Start development server
-npm run dev
+just run
 
-# Build for production
-npm start
+# Start with hot reload
+just dev
+
+# Build and run Docker container
+just docker-run
 ```
 
 ## Deployment
@@ -43,14 +58,17 @@ This project uses GitHub Actions with self-hosted runners for CI/CD deployment. 
 
 ```bash
 # Deploy to homelab server
-scp . mi@buntubox:~/docker/stacks/koder/
-ssh mi@buntubox "cd ~/docker/stacks/koder && docker compose -f kod.yml up -d --build"
+just deploy
+
+# Or deploy only code changes (faster)
+just deploy-code
 ```
 
 ## URLs
 
 - **Web App**: https://kod.arweb.dev
 - **API**: https://kod.arweb.dev/api
+- **API Docs**: https://kod.arweb.dev/docs (FastAPI auto-documentation)
 
 ## Session Management
 
@@ -65,9 +83,10 @@ Sessions are tracked using UUIDs and automatically expire after 30 minutes of in
 
 ## API Endpoints
 
-- `POST /api/chat` - Send message to Claude Code
-- `POST /api/session/:sessionId/end` - End session
-- `GET /api/health` - Health check
+- `POST /api/chat` - Send message to AI (Claude Code or opencode)
+- `POST /api/session/{sessionId}/end` - End session
+- `GET /api/health` - Health check with session statistics
+- `GET /docs` - Interactive API documentation (FastAPI)
 
 ## Predefined Paths
 
