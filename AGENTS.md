@@ -1,6 +1,6 @@
 # AGENTS.md
 
-This file provides guidance to AI agents when working with the kod repository.
+This file provides guidance to AI agents when working with the koder repository.
 
 ## Project Overview
 
@@ -25,15 +25,15 @@ jobs:
 1. **Changes are pushed** to the repository
 2. **GitHub Actions** triggers on push to main branch
 3. **Self-hosted runner** executes deployment script
-4. **Files are copied** to `~/docker/stacks/kod/` on buntubox
+4. **Files are copied** to `~/docker/stacks/koder/` on buntubox
 5. **Docker container** is rebuilt and restarted
-6. **NPM proxy** is configured for `code.arweb.dev`
+6. **NPM proxy** is configured for `kod.arweb.dev`
 
 ### Manual Deployment (if needed)
 
 ```bash
 # Copy files to server
-scp . mi@buntubox:~/docker/stacks/kod/
+scp . mi@buntubox:~/docker/stacks/koder/
 
 # Deploy container
 ssh mi@buntubox "cd ~/docker/stacks/kod && docker compose -f kod.yml up -d --build"
@@ -42,7 +42,7 @@ ssh mi@buntubox "cd ~/docker/stacks/kod && docker compose -f kod.yml up -d --bui
 ## Repository Structure
 
 ```
-kod/
+koder/
 ├── public/
 │   └── index.html          # Frontend HTML/CSS/JS
 ├── server/
@@ -82,7 +82,7 @@ Paths are hardcoded in `public/index.html`:
 - `/Users/Pc/repos/homelab`
 - `/Users/Pc/repos`
 - `/Users/Pc`
-- `/Users/Pc/repos/kod`
+- `/Users/Pc/repos/koder`
 
 ### Docker Configuration
 - Runs as non-root user (nodejs:1001)
@@ -92,7 +92,7 @@ Paths are hardcoded in `public/index.html`:
 ## Testing
 
 After deployment, verify:
-1. **Web interface** loads at `https://code.arweb.dev`
+1. **Web interface** loads at `https://kod.arweb.dev`
 2. **Path selection** works correctly
 3. **Chat interface** responds to messages
 4. **Claude CLI** executes commands properly
@@ -109,8 +109,8 @@ After deployment, verify:
 ## NPM Proxy Configuration
 
 The service is proxied through Nginx Proxy Manager:
-- **Domain**: `code.arweb.dev`
-- **Container**: `kod`
+- **Domain**: `kod.arweb.dev`
+  - **Container**: `koder`
 - **Port**: 3000
 - **SSL**: Forced with wildcard certificate
 - **WebSocket**: Supported for real-time features
@@ -120,10 +120,10 @@ The service is proxied through Nginx Proxy Manager:
 ### Container won't start
 ```bash
 # Check logs
-ssh mi@buntubox "docker logs kod"
+ssh mi@buntubox "docker logs koder"
 
 # Rebuild and restart
-ssh mi@buntubox "cd ~/docker/stacks/kod && docker compose down && docker compose up -d --build"
+ssh mi@buntubox "cd ~/docker/stacks/koder && docker compose down && docker compose up -d --build"
 ```
 
 ### NPM proxy not working
@@ -156,7 +156,7 @@ ssh mi@buntubox "which claude"
 2. **Test** functionality if possible
 3. **Commit changes** with descriptive message
 4. **Push to main branch** (triggers automatic deployment)
-5. **Verify deployment** at `https://code.arweb.dev`
+5. **Verify deployment** at `https://kod.arweb.dev`
 
 ### Session Management
 

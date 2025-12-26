@@ -1,4 +1,4 @@
-name: Code Web App CI/CD
+name: Koder CI/CD
 
 on:
   push:
@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
 
 env:
-  STACK_PATH: /home/mi/docker/stacks/kod
+  STACK_PATH: /home/mi/docker/stacks/koder
 
 jobs:
   # Test job - runs on all branches and PRs
@@ -61,5 +61,5 @@ jobs:
       - name: Verify deployment
         run: |
           sleep 10
-          docker ps --filter name=kod
+          docker ps --filter name=koder
           curl -s http://localhost:3000/api/health || echo "Health check pending..."

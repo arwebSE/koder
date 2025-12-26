@@ -1,10 +1,10 @@
-# Code Web App
+# Koder
 
 Mobile web wrapper for Claude Code CLI that provides a chat interface with predefined path selection.
 
 ## Overview
 
-This is a minimal web application that acts as a wrapper for the Claude Code CLI, providing a mobile-friendly chat interface accessible via `code.arweb.dev`. Users can select predefined working directories and interact with Claude Code through a conversational interface.
+This is a minimal web application that acts as a wrapper for the Claude Code CLI, providing a mobile-friendly chat interface accessible via `kod.arweb.dev`. Users can select predefined working directories and interact with Claude Code through a conversational interface.
 
 ## Features
 
@@ -43,14 +43,14 @@ This project uses GitHub Actions with self-hosted runners for CI/CD deployment. 
 
 ```bash
 # Deploy to homelab server
-scp . mi@buntubox:~/docker/stacks/kod/
-ssh mi@buntubox "cd ~/docker/stacks/kod && docker compose -f kod.yml up -d --build"
+scp . mi@buntubox:~/docker/stacks/koder/
+ssh mi@buntubox "cd ~/docker/stacks/koder && docker compose -f kod.yml up -d --build"
 ```
 
 ## URLs
 
-- **Web App**: https://code.arweb.dev
-- **API**: https://code.arweb.dev/api
+- **Web App**: https://kod.arweb.dev
+- **API**: https://kod.arweb.dev/api
 
 ## Session Management
 
@@ -74,7 +74,7 @@ Sessions are tracked using UUIDs and automatically expire after 30 minutes of in
 - `/Users/Pc/repos/homelab` - Homelab repository
 - `/Users/Pc/repos` - Main repositories directory
 - `/Users/Pc` - User home directory
-- `/Users/Pc/repos/kod` - This project
+- `/Users/Pc/repos/koder` - This project
 
 ## AGENTS.md
 

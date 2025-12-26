@@ -1,10 +1,10 @@
 services:
-  kod:
+  koder:
     build: 
       context: .
       dockerfile: Dockerfile
-    image: kod
-    container_name: kod
+    image: koder
+    container_name: koder
     restart: unless-stopped
     networks:
       - public_net
