@@ -11,14 +11,20 @@ This repository is ready for GitHub connection with PAT token configured.
 
 ## Instructions for Human:
 
-1. Create private repository: `https://github.com/micr0-dev/code-webapp`
-2. Connect and push:
+The PAT token lacks repository creation permissions. Please create the repo manually:
+
+1. **Visit GitHub**: https://github.com/arwebSE/new
+2. **Create repository**:
+   - Name: `code-webapp`
+   - Description: `Mobile web wrapper for Claude Code CLI`
+   - Visibility: **Private**
+   - Don't initialize with README (already exists)
+3. **Connect and push**:
    ```bash
    cd ../code-webapp
-   git remote add origin https://micr0-dev:GITHUB_TOKEN@github.com/micr0-dev/code-webapp.git
+   git remote set-url origin https://github.com/arwebSE/code-webapp.git
    git push -u origin master
    ```
-   *Or use GitHub CLI/SSH key if preferred*
 
 ## GitHub Repository Details
 
