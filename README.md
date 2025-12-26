@@ -79,3 +79,14 @@ Sessions are tracked using UUIDs and automatically expire after 30 minutes of in
 ## AGENTS.md
 
 See [AGENTS.md](./AGENTS.md) for deployment instructions and guidelines for AI agents working on this repository.
+
+## Recent Changes
+
+This project has been renamed from "kod" to "koder" with the following updates:
+- ✅ Repository renamed to `koder`
+- ✅ Container renamed to `koder` 
+- ✅ Domain updated to `kod.arweb.dev`
+- ✅ All documentation updated
+- ✅ Deployment path updated to `/home/mi/docker/stacks/koder/`
+
+**Note:** You may need to update your Nginx Proxy Manager configuration to point `kod.arweb.dev` to the new `koder` container.
