@@ -1,6 +1,9 @@
 services:
   kod:
-    build: .
+    build: 
+      context: .
+      dockerfile: Dockerfile
+    image: kod
     container_name: kod
     restart: unless-stopped
     networks:
