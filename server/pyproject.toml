@@ -1,5 +1,5 @@
 [project]
-name = "koder"
+name = "koder-backend"
 version = "1.0.0"
 description = "Mobile web wrapper for Claude Code CLI with toggle support"
 authors = [{name = "Agge"}]
@@ -14,8 +14,11 @@ dependencies = [
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
-[tool.uv]
-dev-dependencies = [
+[tool.hatch.build.targets.wheel]
+packages = ["."]
+
+[dependency-groups]
+dev = [
     "pytest>=8.0.0",
     "httpx>=0.25.0",
     "black>=24.0.0",
