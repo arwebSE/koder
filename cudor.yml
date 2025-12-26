@@ -1,7 +1,7 @@
 services:
-  code-webapp:
+  cudor:
     build: .
-    container_name: code-webapp
+    container_name: cudor
     restart: unless-stopped
     networks:
       - public_net

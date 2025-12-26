@@ -1,5 +1,5 @@
 {
-  "name": "code-webapp",
+  "name": "cudor",
   "version": "1.0.0",
   "description": "Mobile web wrapper for Claude Code CLI",
   "main": "server/app.js",
