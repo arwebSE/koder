@@ -21,7 +21,7 @@ The PAT token lacks repository creation permissions. Please create the repo manu
    - Don't initialize with README (already exists)
 3. **Connect and push**:
    ```bash
-   cd ../kod
+   cd ../code-webapp
    git remote set-url origin https://github.com/arwebSE/kod.git
    git push -u origin master
    ```
