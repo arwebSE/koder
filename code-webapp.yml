@@ -1,0 +1,18 @@
+services:
+  code-webapp:
+    build: .
+    container_name: code-webapp
+    restart: unless-stopped
+    networks:
+      - public_net
+    volumes:
+      - /Users/Pc:/Users/Pc:ro  # Mount user directory read-only
+    environment:
+      - NODE_ENV=production
+    # Expose internally only - NPM will handle external access
+    expose:
+      - "3000"
+
+networks:
+  public_net:
+    external: true
