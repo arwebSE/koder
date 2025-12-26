@@ -43,8 +43,8 @@ This project uses GitHub Actions with self-hosted runners for CI/CD deployment. 
 
 ```bash
 # Deploy to homelab server
-scp . mi@buntubox:~/docker/stacks/cudor/
-ssh mi@buntubox "cd ~/docker/stacks/cudor && docker compose -f cudor.yml up -d --build"
+scp . mi@buntubox:~/docker/stacks/kod/
+ssh mi@buntubox "cd ~/docker/stacks/kod && docker compose -f kod.yml up -d --build"
 ```
 
 ## URLs
@@ -74,7 +74,7 @@ Sessions are tracked using UUIDs and automatically expire after 30 minutes of in
 - `/Users/Pc/repos/homelab` - Homelab repository
 - `/Users/Pc/repos` - Main repositories directory
 - `/Users/Pc` - User home directory
-- `/Users/Pc/repos/cudor` - This project
+- `/Users/Pc/repos/kod` - This project
 
 ## AGENTS.md
 

@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
 
 env:
-  STACK_PATH: /home/mi/docker/stacks/cudor
+  STACK_PATH: /home/mi/docker/stacks/kod
 
 jobs:
   # Test job - runs on all branches and PRs
@@ -45,7 +45,7 @@ jobs:
       - name: Deploy to server
         run: |
           # Copy stack file and configuration
-          cp cudor.yml Dockerfile .dockerignore package.json $STACK_PATH/
+          cp kod.yml Dockerfile .dockerignore package.json $STACK_PATH/
 
           # Copy application files
           cp public/index.html $STACK_PATH/public/
@@ -56,10 +56,10 @@ jobs:
 
           # Build and deploy
           cd $STACK_PATH
-          docker compose -f cudor.yml up -d --build
+          docker compose -f kod.yml up -d --build
 
       - name: Verify deployment
         run: |
           sleep 10
-          docker ps --filter name=cudor
+          docker ps --filter name=kod
           curl -s http://localhost:3000/api/health || echo "Health check pending..."

@@ -15,22 +15,22 @@ The PAT token lacks repository creation permissions. Please create the repo manu
 
 1. **Visit GitHub**: https://github.com/arwebSE/new
 2. **Create repository**:
-   - Name: `cudor`
+   - Name: `kod`
    - Description: `Mobile web wrapper for Claude Code CLI`
    - Visibility: **Private**
    - Don't initialize with README (already exists)
 3. **Connect and push**:
    ```bash
-   cd ../cudor
-   git remote set-url origin https://github.com/arwebSE/cudor.git
+   cd ../kod
+   git remote set-url origin https://github.com/arwebSE/kod.git
    git push -u origin master
    ```
 
 ## GitHub Repository Details
 
-- **Name**: cudor
+- **Name**: kod
 - **Visibility**: Private
-- **Owner**: micr0-dev
+- **Owner**: arwebSE
 - **Description**: Mobile web wrapper for Claude Code CLI
 
 ## Automated Setup Ready

@@ -1,6 +1,6 @@
 # AGENTS.md
 
-This file provides guidance to AI agents when working with the cudor repository.
+This file provides guidance to AI agents when working with the kod repository.
 
 ## Project Overview
 
@@ -25,7 +25,7 @@ jobs:
 1. **Changes are pushed** to the repository
 2. **GitHub Actions** triggers on push to main branch
 3. **Self-hosted runner** executes deployment script
-4. **Files are copied** to `~/docker/stacks/cudor/` on buntubox
+4. **Files are copied** to `~/docker/stacks/kod/` on buntubox
 5. **Docker container** is rebuilt and restarted
 6. **NPM proxy** is configured for `code.arweb.dev`
 
@@ -33,21 +33,21 @@ jobs:
 
 ```bash
 # Copy files to server
-scp . mi@buntubox:~/docker/stacks/cudor/
+scp . mi@buntubox:~/docker/stacks/kod/
 
 # Deploy container
-ssh mi@buntubox "cd ~/docker/stacks/cudor && docker compose -f cudor.yml up -d --build"
+ssh mi@buntubox "cd ~/docker/stacks/kod && docker compose -f kod.yml up -d --build"
 ```
 
 ## Repository Structure
 
 ```
-cudor/
+kod/
 ├── public/
 │   └── index.html          # Frontend HTML/CSS/JS
 ├── server/
 │   └── app.js              # Express.js backend
-├── cudor.yml         # Docker Compose configuration
+├── kod.yml         # Docker Compose configuration
 ├── Dockerfile              # Container build instructions
 ├── package.json            # Node.js dependencies
 ├── .github/workflows/
@@ -70,7 +70,7 @@ cudor/
 - File system access with security constraints
 - API endpoints for chat and session control
 
-### Deployment (`cudor.yml`)
+### Deployment (`kod.yml`)
 - Docker Compose configuration
 - Uses `public_net` for internet exposure via NPM
 - Read-only mount of user directories for security
@@ -82,7 +82,7 @@ Paths are hardcoded in `public/index.html`:
 - `/Users/Pc/repos/homelab`
 - `/Users/Pc/repos`
 - `/Users/Pc`
-- `/Users/Pc/repos/cudor`
+- `/Users/Pc/repos/kod`
 
 ### Docker Configuration
 - Runs as non-root user (nodejs:1001)
@@ -110,7 +110,7 @@ After deployment, verify:
 
 The service is proxied through Nginx Proxy Manager:
 - **Domain**: `code.arweb.dev`
-- **Container**: `cudor`
+- **Container**: `kod`
 - **Port**: 3000
 - **SSL**: Forced with wildcard certificate
 - **WebSocket**: Supported for real-time features
@@ -120,10 +120,10 @@ The service is proxied through Nginx Proxy Manager:
 ### Container won't start
 ```bash
 # Check logs
-ssh mi@buntubox "docker logs cudor"
+ssh mi@buntubox "docker logs kod"
 
 # Rebuild and restart
-ssh mi@buntubox "cd ~/docker/stacks/cudor && docker compose down && docker compose up -d --build"
+ssh mi@buntubox "cd ~/docker/stacks/kod && docker compose down && docker compose up -d --build"
 ```
 
 ### NPM proxy not working
@@ -147,7 +147,7 @@ ssh mi@buntubox "which claude"
 
 1. **Frontend changes**: Update `public/index.html` and test mobile responsiveness
 2. **Backend changes**: Update `server/app.js` and test API endpoints
-3. **Deployment changes**: Update `cudor.yml` or `Dockerfile`
+3. **Deployment changes**: Update `kod.yml` or `Dockerfile`
 4. **New dependencies**: Add to `package.json` and rebuild container
 
 ### Commit and Deploy Workflow
