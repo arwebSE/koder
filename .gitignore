@@ -1,3 +1,43 @@
 .env
 node_modules
-.venv
+__pycache__
+
+# Frontend
+frontend/package-lock.json
+frontend/dist/
+frontend/build/
+
+# Python
+server/uv.lock
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+.venv/
+pip-log.txt
+pip-delete-this-directory.txt
+.tox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Temporary files
+*.tmp
+*.temp
