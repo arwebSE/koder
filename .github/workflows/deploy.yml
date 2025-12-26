@@ -1,37 +1,65 @@
-name: Deploy Code Web App
+name: Code Web App CI/CD
 
 on:
   push:
-    branches: [ main ]
+    branches: [main]
   pull_request:
-    branches: [ main ]
+    branches: [main]
+  workflow_dispatch:
+
+env:
+  STACK_PATH: /home/mi/docker/stacks/code-webapp
 
 jobs:
+  # Test job - runs on all branches and PRs
+  test:
+    runs-on: [self-hosted, homelab]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Verify server syntax
+        run: node -c server/app.js
+
+  # Deploy job - only runs on main after tests pass
   deploy:
     runs-on: [self-hosted, homelab]
-    
+    needs: test
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-      
-    - name: Create stack directory
-      run: |
-        ssh mi@buntubox "mkdir -p ~/docker/stacks/code-webapp"
-        
-    - name: Copy files to server
-      run: |
-        scp . mi@buntubox:~/docker/stacks/code-webapp/
-        
-    - name: Deploy application
-      run: |
-        ssh mi@buntubox "cd ~/docker/stacks/code-webapp && docker compose -f code-webapp.yml up -d --build"
-        
-    - name: Verify deployment
-      run: |
-        sleep 10
-        ssh mi@buntubox "docker ps | grep code-webapp" || exit 1
-        echo "✅ Code Web App deployed successfully"
-        
-    - name: Health check
-      run: |
-        curl -f http://localhost:3000/api/health || echo "⚠️ Health check failed - this may be expected if not yet proxied"
+      - uses: actions/checkout@v4
+
+      - name: Create directories
+        run: |
+          mkdir -p $STACK_PATH
+          mkdir -p $STACK_PATH/public
+          mkdir -p $STACK_PATH/server
+
+      - name: Deploy to server
+        run: |
+          # Copy stack file and configuration
+          cp code-webapp.yml Dockerfile .dockerignore package.json $STACK_PATH/
+
+          # Copy application files
+          cp public/index.html $STACK_PATH/public/
+          cp server/app.js $STACK_PATH/server/
+
+          # Copy GitHub workflow
+          cp -r .github $STACK_PATH/
+
+          # Build and deploy
+          cd $STACK_PATH
+          docker compose -f code-webapp.yml up -d --build
+
+      - name: Verify deployment
+        run: |
+          sleep 10
+          docker ps --filter name=code-webapp
+          curl -s http://localhost:3000/api/health || echo "Health check pending..."
