@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(netstat:*)",
+      "Bash(findstr:*)",
+      "Bash(curl:*)",
+      "Bash(python app.py:*)",
+      "Bash(npm run dev:*)",
+      "Bash(where opencode:*)",
+      "Bash(opencode \"echo test\")",
+      "Bash(opencode --help:*)",
+      "Bash(opencode run:*)",
+      "Skill(glm-plan-usage:usage-query)",
+      "Skill(glm-plan-usage:usage-query-skill)"
+    ]
+  }
+}

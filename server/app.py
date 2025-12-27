@@ -23,7 +23,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-PORT = 3000
+PORT = 5174
 
 # Store sessions in memory
 sessions: Dict[str, Dict[str, Any]] = {}
@@ -58,30 +58,48 @@ async def execute_ai(provider: str, command: str, cwd: str, session_id: Optional
                 cmd.extend(['--session-id', session_id])
             cmd.append(command)
         elif provider == 'opencode':
-            cmd = ['python3', '/usr/local/bin/opencode', command]
+            # On Windows, opencode is an npm package; on Unix, it's a Python script
+            if os.name == 'nt':
+                cmd = ['opencode', 'run', command]
+            else:
+                cmd = ['python3', '/usr/local/bin/opencode', 'run', command]
             if session_id and session_id in sessions:
                 cmd.extend(['--session', session_id])
         else:
             raise ValueError(f"Unknown provider: {provider}")
         
         # Run the command asynchronously
-        process = await asyncio.create_subprocess_exec(
-            *cmd,
-            cwd=cwd,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
-            limit=1024*1024  # 1MB buffer limit
-        )
+        # On Windows, we need shell=True for .cmd files
+        shell_needed = os.name == 'nt' and provider == 'opencode'
+
+        if shell_needed:
+            # For shell mode, join cmd into a single string
+            cmd_str = ' '.join(f'"{arg}"' if ' ' in arg else arg for arg in cmd)
+            process = await asyncio.create_subprocess_shell(
+                cmd_str,
+                cwd=cwd,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+                limit=1024*1024  # 1MB buffer limit
+            )
+        else:
+            process = await asyncio.create_subprocess_exec(
+                *cmd,
+                cwd=cwd,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+                limit=1024*1024  # 1MB buffer limit
+            )
         
         stdout, stderr = await asyncio.wait_for(
-            process.communicate(), 
+            process.communicate(),
             timeout=300.0  # 5 minute timeout
         )
-        
+
         if process.returncode == 0:
-            return stdout.decode('utf-8')
+            return stdout.decode('utf-8', errors='replace')
         else:
-            error_msg = stderr.decode('utf-8') or f"Command failed with code {process.returncode}"
+            error_msg = stderr.decode('utf-8', errors='replace') or f"Command failed with code {process.returncode}"
             raise RuntimeError(error_msg)
             
     except asyncio.TimeoutError:
@@ -145,12 +163,13 @@ async def chat(request: ChatRequest):
         )
         
     except Exception as error:
-        print(f'Error executing AI: {error}')
+        error_str = str(error).encode('utf-8', errors='replace').decode('utf-8', errors='replace')
+        print(f'Error executing AI: {error_str}')
         raise HTTPException(
             status_code=500,
             detail={
                 'error': 'Failed to execute command',
-                'details': str(error)
+                'details': error_str
             }
         )
 

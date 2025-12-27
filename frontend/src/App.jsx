@@ -3,7 +3,7 @@ import './App.css'
 
 const App = () => {
   const [currentPath, setCurrentPath] = useState('/Users/Pc/repos/homelab')
-  const [currentProvider, setCurrentProvider] = useState('claude')
+  const [currentProvider, setCurrentProvider] = useState('opencode')
   const [sessionId, setSessionId] = useState(null)
   const [messages, setMessages] = useState([])
   const [inputMessage, setInputMessage] = useState('')

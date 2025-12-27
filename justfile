@@ -20,8 +20,8 @@ dev-frontend:
 # Run both frontend and backend (requires two terminals)
 dev-full:
     @echo "Run these in separate terminals:"
-    @echo "Terminal 1: just dev-frontend"
-    @echo "Terminal 2: just dev"
+    @echo "Terminal 1: just dev-frontend (port 5173+)"
+    @echo "Terminal 2: just dev (port 8000)"
 
 # Build frontend
 build-frontend:
@@ -71,7 +71,7 @@ logs:
 
 # Health check
 health:
-    curl -s http://localhost:3000/api/health | python3 -m json.tool
+    curl -s http://localhost:8000/api/health | python3 -m json.tool 2>/dev/null || echo "Backend not running on 8000"
 
 # Run tests
 test:
@@ -83,7 +83,7 @@ test-api:
 
 # View API docs
 docs:
-    @echo "API docs available at http://localhost:3000/docs when server is running"
+    @echo "API docs available at http://localhost:8000/docs when server is running"
 
 # Format code
 format:
