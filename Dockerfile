@@ -8,33 +8,30 @@ COPY frontend/ .
 RUN npm run build
 
 # Python backend stage
-FROM python:3.11-alpine
+FROM python:3.11-slim
 
 # Install uv for package management
 RUN pip install uv
 
 WORKDIR /app
 
-# Copy server dependencies and install them
-COPY server/pyproject.toml ./
-RUN uv pip install --system
+# Copy server files
+COPY server/ .
 
-# Install opencode CLI tool
-RUN pip install opencode
+# Install dependencies as root first
+RUN uv pip install --system -e .
 
-# Copy application code
-COPY server/ ./server/
-COPY --from=frontend-builder /app/frontend/dist ./static/
+# Copy frontend build (vite builds to ../static relative to frontend dir)
+COPY --from=frontend-builder /app/static ./static/
 
-# Create non-root user
-RUN addgroup -g 1001 -S python
-RUN adduser -S python -u 1001
-
-# Change ownership of the app directory
-RUN chown -R python:python /app
+# Create non-root user and setup directories
+RUN groupadd -g 1001 python && \
+    useradd -u 1001 -g python python && \
+    mkdir -p /home/python/.cache && \
+    chown -R python:python /app /home/python
 
 USER python
 
 EXPOSE 3000
 
-CMD ["uv", "run", "uvicorn", "server.app:app", "--host", "0.0.0.0", "--port", "3000"]
+CMD ["uv", "run", "uvicorn", "app:app", "--host", "0.0.0.0", "--port", "3000"]
