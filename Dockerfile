@@ -32,6 +32,6 @@ RUN groupadd -g 1001 python && \
 
 USER python
 
-EXPOSE 3000
+EXPOSE 5174
 
-CMD ["uv", "run", "uvicorn", "app:app", "--host", "0.0.0.0", "--port", "3000"]
+CMD ["uv", "run", "uvicorn", "app:app", "--host", "0.0.0.0", "--port", "5174"]

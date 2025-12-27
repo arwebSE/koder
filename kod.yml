@@ -1,6 +1,6 @@
 services:
   koder:
-    build: 
+    build:
       context: .
       dockerfile: Dockerfile
     image: koder
@@ -10,11 +10,13 @@ services:
       - public_net
     volumes:
       - /Users/Pc:/Users/Pc:ro  # Mount user directory read-only
+      - /usr/local/bin/claude:/usr/local/bin/claude:ro  # Mount Claude CLI
+      - /home/mi/.claude:/home/python/.claude:ro  # Mount Claude config
     environment:
       - NODE_ENV=production
     # Expose internally only - NPM will handle external access
     expose:
-      - "3000"
+      - "5174"
 
 networks:
   public_net:
