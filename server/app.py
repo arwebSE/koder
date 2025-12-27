@@ -297,15 +297,16 @@ async def list_sessions():
     except Exception as error:
         raise HTTPException(status_code=500, detail=str(error))
 
-# Mount static files
-app.mount("/static", StaticFiles(directory="static"), name="static")
-
 # Serve React app
 @app.get("/")
 async def read_root():
     """Serve the React app"""
     from fastapi.responses import FileResponse
     return FileResponse("static/index.html")
+
+# Mount static files - must come after route definitions
+app.mount("/assets", StaticFiles(directory="static/assets"), name="assets")
+app.mount("/", StaticFiles(directory="static", html=True), name="static")
 
 if __name__ == "__main__":
     import uvicorn
