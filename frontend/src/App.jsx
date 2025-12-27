@@ -3,7 +3,7 @@ import './App.css'
 
 const App = () => {
   const [currentPath, setCurrentPath] = useState('/Users/Pc/repos/homelab')
-  const [currentProvider, setCurrentProvider] = useState('opencode')
+  const [currentProvider, setCurrentProvider] = useState('claude')
   const [sessionId, setSessionId] = useState(null)
   const [messages, setMessages] = useState([])
   const [inputMessage, setInputMessage] = useState('')
@@ -54,6 +54,9 @@ const App = () => {
     setIsLoading(true)
 
     try {
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), 120000) // 2 minute timeout
+
       const response = await fetch('/api/chat', {
         method: 'POST',
         headers: {
@@ -64,11 +67,18 @@ const App = () => {
           path: currentPath,
           sessionId,
           provider: currentProvider
-        })
+        }),
+        signal: controller.signal
       })
 
+      clearTimeout(timeoutId)
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`)
+      }
+
       const data = await response.json()
-      
+
       if (data.sessionId) {
         setSessionId(data.sessionId)
       }
@@ -85,7 +95,9 @@ const App = () => {
       const errorMessage = {
         id: Date.now() + 1,
         role: 'assistant',
-        content: `Error: ${error.message}`
+        content: error.name === 'AbortError'
+          ? `Request timed out. The ${currentProvider} server may be slow or unavailable. Try switching to Claude.`
+          : `Error: ${error.message}`
       }
       setMessages(prev => [...prev, errorMessage])
     } finally {
