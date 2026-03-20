@@ -29,11 +29,18 @@ const {
 const { createBridgeSecureTransport } = require("./secure-transport");
 const { createRolloutLiveMirrorController } = require("./rollout-live-mirror");
 
+const DEFAULT_RELAY_FLAP_WINDOW_MS = 60_000;
+const DEFAULT_RELAY_FLAP_THRESHOLD = 8;
+const DEFAULT_RELAY_FLAP_RECYCLE_COOLDOWN_MS = 5 * 60_000;
+const DEFAULT_RELAY_FLAP_RUNTIME_QUIET_MS = 30_000;
+
 function startBridge({
   config: explicitConfig = null,
   printPairingQr = true,
   onPairingPayload = null,
   onBridgeStatus = null,
+  createCodexTransportImpl = createCodexTransport,
+  now = () => Date.now(),
 } = {}) {
   const config = explicitConfig || readBridgeConfig();
   const relayBaseUrl = config.relayUrl.replace(/\/+$/, "");
@@ -112,12 +119,12 @@ function startBridge({
     : null;
   let contextUsageWatcher = null;
   let watchedContextUsageKey = null;
-
-  const codex = createCodexTransport({
-    endpoint: config.codexEndpoint,
-    env: process.env,
-    logPrefix: "[remodex]",
-  });
+  let codex = null;
+  let relayDisconnectTimestampsMs = [];
+  let lastCodexRecycleAtMs = 0;
+  let isRecyclingCodexRuntime = false;
+  let lastCodexActivityAtMs = now();
+  const activeTurnKeysByThreadId = new Map();
   publishBridgeStatus({
     state: "starting",
     connectionStatus: "starting",
@@ -125,23 +132,115 @@ function startBridge({
     lastError: "",
   });
 
-  codex.onError((error) => {
-    publishBridgeStatus({
-      state: "error",
-      connectionStatus: "error",
-      pid: process.pid,
-      lastError: error.message,
+  function bindCodexTransport(transport) {
+    transport.onError((error) => {
+      if (transport !== codex) {
+        return;
+      }
+
+      publishBridgeStatus({
+        state: "error",
+        connectionStatus: "error",
+        pid: process.pid,
+        lastError: error.message,
+      });
+      if (config.codexEndpoint) {
+        console.error(`[remodex] Failed to connect to Codex endpoint: ${config.codexEndpoint}`);
+      } else {
+        console.error("[remodex] Failed to start `codex app-server`.");
+        console.error(`[remodex] Launch command: ${transport.describe()}`);
+        console.error("[remodex] Make sure the Codex CLI is installed and that the launcher works on this OS.");
+      }
+      console.error(error.message);
+      process.exit(1);
     });
-    if (config.codexEndpoint) {
-      console.error(`[remodex] Failed to connect to Codex endpoint: ${config.codexEndpoint}`);
-    } else {
-      console.error("[remodex] Failed to start `codex app-server`.");
-      console.error(`[remodex] Launch command: ${codex.describe()}`);
-      console.error("[remodex] Make sure the Codex CLI is installed and that the launcher works on this OS.");
+
+    transport.onMessage((message) => {
+      if (transport !== codex) {
+        return;
+      }
+
+      lastCodexActivityAtMs = now();
+      trackTurnActivityFromMessage("codex", message);
+      trackCodexHandshakeState(message);
+      desktopRefresher.handleOutbound(message);
+      pushNotificationTracker.handleOutbound(message);
+      rememberThreadFromMessage("codex", message);
+      secureTransport.queueOutboundApplicationMessage(message, sendRelayWireMessage);
+    });
+
+    transport.onClose(() => {
+      if (transport !== codex) {
+        return;
+      }
+
+      logConnectionStatus("disconnected");
+      publishBridgeStatus({
+        state: "stopped",
+        connectionStatus: "disconnected",
+        pid: process.pid,
+        lastError: "",
+      });
+      isShuttingDown = true;
+      clearReconnectTimer();
+      stopContextUsageWatcher();
+      rolloutLiveMirror?.stopAll();
+      desktopRefresher.handleTransportReset();
+      if (socket?.readyState === WebSocket.OPEN || socket?.readyState === WebSocket.CONNECTING) {
+        socket.close();
+      }
+    });
+
+    return transport;
+  }
+
+  // Recycles only the spawned local runtime after repeated relay flapping, leaving pairing/session state intact.
+  function recycleCodexRuntimeIfNeeded(reason) {
+    if (isShuttingDown || isRecyclingCodexRuntime) {
+      return;
     }
-    console.error(error.message);
-    process.exit(1);
-  });
+
+    if (config.codexEndpoint || codex?.mode !== "spawn") {
+      return;
+    }
+
+    const currentTimeMs = now();
+    relayDisconnectTimestampsMs = trimRecentRelayDisconnects(relayDisconnectTimestampsMs, currentTimeMs);
+    if (!shouldRecycleCodexRuntimeForRelayFlapping({
+      disconnectTimestampsMs: relayDisconnectTimestampsMs,
+      nowMs: currentTimeMs,
+      lastRecycleAtMs: lastCodexRecycleAtMs,
+      lastCodexActivityAtMs,
+      activeTurnCount: activeTurnKeysByThreadId.size,
+    })) {
+      return;
+    }
+
+    isRecyclingCodexRuntime = true;
+    lastCodexRecycleAtMs = currentTimeMs;
+    relayDisconnectTimestampsMs = [];
+    codexHandshakeState = "cold";
+    forwardedInitializeRequestIds.clear();
+    stopContextUsageWatcher();
+    rolloutLiveMirror?.stopAll();
+    console.error(`[remodex] relay reconnect storm detected; restarting local Codex runtime (${reason})`);
+
+    try {
+      const previousCodex = codex;
+      codex = bindCodexTransport(createCodexTransportImpl({
+        endpoint: config.codexEndpoint,
+        env: process.env,
+      }));
+      previousCodex?.shutdown();
+    } finally {
+      isRecyclingCodexRuntime = false;
+    }
+  }
+
+  codex = bindCodexTransport(createCodexTransportImpl({
+    endpoint: config.codexEndpoint,
+    env: process.env,
+  }));
 
   function clearReconnectTimer() {
     if (!reconnectTimer) {
@@ -176,7 +275,7 @@ function startBridge({
 
     if (closeCode === 4000 || closeCode === 4001) {
       logConnectionStatus("disconnected");
-      shutdown(codex, () => socket, () => {
+      shutdown(() => codex, () => socket, () => {
         isShuttingDown = true;
         clearReconnectTimer();
       });
@@ -238,12 +337,18 @@ function startBridge({
 
     nextSocket.on("close", (code) => {
       logConnectionStatus("disconnected");
+      const disconnectTimestampMs = now();
+      relayDisconnectTimestampsMs = trimRecentRelayDisconnects(
+        relayDisconnectTimestampsMs.concat(disconnectTimestampMs),
+        disconnectTimestampMs
+      );
       if (socket === nextSocket) {
         socket = null;
       }
       stopContextUsageWatcher();
       rolloutLiveMirror?.stopAll();
       desktopRefresher.handleTransportReset();
+      recycleCodexRuntimeIfNeeded(`close=${code ?? "unknown"}`);
       scheduleRelayReconnect(code);
     });
 
@@ -260,37 +365,11 @@ function startBridge({
   pushServiceClient.logUnavailable();
   connectRelay();
 
-  codex.onMessage((message) => {
-    trackCodexHandshakeState(message);
-    desktopRefresher.handleOutbound(message);
-    pushNotificationTracker.handleOutbound(message);
-    rememberThreadFromMessage("codex", message);
-    secureTransport.queueOutboundApplicationMessage(message, sendRelayWireMessage);
-  });
-
-  codex.onClose(() => {
-    logConnectionStatus("disconnected");
-    publishBridgeStatus({
-      state: "stopped",
-      connectionStatus: "disconnected",
-      pid: process.pid,
-      lastError: "",
-    });
-    isShuttingDown = true;
-    clearReconnectTimer();
-    stopContextUsageWatcher();
-    rolloutLiveMirror?.stopAll();
-    desktopRefresher.handleTransportReset();
-    if (socket?.readyState === WebSocket.OPEN || socket?.readyState === WebSocket.CONNECTING) {
-      socket.close();
-    }
-  });
-
-  process.on("SIGINT", () => shutdown(codex, () => socket, () => {
+  process.on("SIGINT", () => shutdown(() => codex, () => socket, () => {
     isShuttingDown = true;
     clearReconnectTimer();
   }));
-  process.on("SIGTERM", () => shutdown(codex, () => socket, () => {
+  process.on("SIGTERM", () => shutdown(() => codex, () => socket, () => {
     isShuttingDown = true;
     clearReconnectTimer();
   }));
@@ -318,6 +397,7 @@ function startBridge({
     if (handleGitRequest(rawMessage, sendApplicationResponse)) {
       return;
     }
+    trackTurnActivityFromMessage("phone", rawMessage);
     desktopRefresher.handleInbound(rawMessage);
     rolloutLiveMirror?.observeInbound(rawMessage);
     rememberThreadFromMessage("phone", rawMessage);
@@ -339,6 +419,12 @@ function startBridge({
     if (shouldStartContextUsageWatcher(context)) {
       ensureContextUsageWatcher(context);
     }
+  }
+
+  // Tracks known in-flight turns so relay-only churn does not kill healthy local work.
+  function trackTurnActivityFromMessage(source, rawMessage) {
+    const context = extractBridgeMessageContext(rawMessage);
+    applyTrackedTurnActivity(activeTurnKeysByThreadId, { source, context });
   }
 
   // Mirrors CodexMonitor's persisted token_count fallback so the phone keeps
@@ -520,7 +606,7 @@ function buildMacRegistration(deviceState) {
   };
 }
 
-function shutdown(codex, getSocket, beforeExit = () => {}) {
+function shutdown(getCodex, getSocket, beforeExit = () => {}) {
   beforeExit();
 
   const socket = getSocket();
@@ -528,9 +614,49 @@ function shutdown(codex, getSocket, beforeExit = () => {}) {
     socket.close();
   }
 
+  const codex = getCodex();
   codex.shutdown();
 
   setTimeout(() => process.exit(0), 100);
+}
+
+function trimRecentRelayDisconnects(
+  disconnectTimestampsMs,
+  nowMs,
+  windowMs = DEFAULT_RELAY_FLAP_WINDOW_MS
+) {
+  return disconnectTimestampsMs.filter((timestampMs) => nowMs - timestampMs <= windowMs);
+}
+
+function shouldRecycleCodexRuntimeForRelayFlapping({
+  disconnectTimestampsMs,
+  nowMs,
+  threshold = DEFAULT_RELAY_FLAP_THRESHOLD,
+  windowMs = DEFAULT_RELAY_FLAP_WINDOW_MS,
+  lastRecycleAtMs = 0,
+  cooldownMs = DEFAULT_RELAY_FLAP_RECYCLE_COOLDOWN_MS,
+  lastCodexActivityAtMs = 0,
+  quietMs = DEFAULT_RELAY_FLAP_RUNTIME_QUIET_MS,
+  activeTurnCount = 0,
+}) {
+  if (lastRecycleAtMs > 0 && nowMs - lastRecycleAtMs < cooldownMs) {
+    return false;
+  }
+
+  if (activeTurnCount > 0) {
+    return false;
+  }
+
+  if (lastCodexActivityAtMs > 0 && nowMs - lastCodexActivityAtMs < quietMs) {
+    return false;
+  }
+
+  const recentDisconnectCount = trimRecentRelayDisconnects(
+    disconnectTimestampsMs,
+    nowMs,
+    windowMs
+  ).length;
+  return recentDisconnectCount >= threshold;
 }
 
 function extractBridgeMessageContext(rawMessage) {
@@ -538,19 +664,31 @@ function extractBridgeMessageContext(rawMessage) {
   try {
     parsed = JSON.parse(rawMessage);
   } catch {
-    return { method: "", threadId: null, turnId: null };
+    return { method: "", threadId: null, turnId: null, statusType: "" };
   }
 
   const method = parsed?.method;
   const params = parsed?.params;
   const threadId = extractThreadId(method, params);
   const turnId = extractTurnId(method, params);
+  const statusType = extractStatusType(method, params);
 
   return {
     method: typeof method === "string" ? method : "",
     threadId,
     turnId,
+    statusType,
   };
+}
+
+function envelopeEventObject(params) {
+  if (params?.event && typeof params.event === "object") {
+    return params.event;
+  }
+  if (params?.msg && typeof params.msg === "object") {
+    return params.msg;
+  }
+  return null;
 }
 
 function shouldStartContextUsageWatcher(context) {
@@ -563,50 +701,198 @@ function shouldStartContextUsageWatcher(context) {
 }
 
 function extractThreadId(method, params) {
-  if (method === "turn/start" || method === "turn/started") {
-    return (
-      readString(params?.threadId)
-      || readString(params?.thread_id)
-      || readString(params?.turn?.threadId)
-      || readString(params?.turn?.thread_id)
-    );
-  }
+  if (
+    method === "turn/start"
+    || method === "turn/started"
+    || method === "turn/completed"
+    || method === "turn/failed"
+    || method === "thread/start"
+    || method === "thread/started"
+    || isThreadStatusMethod(method)
+  ) {
+    const eventObject = envelopeEventObject(params);
+    const candidates = [
+      params?.threadId,
+      params?.thread_id,
+      params?.conversationId,
+      params?.conversation_id,
+      params?.thread?.id,
+      params?.thread?.threadId,
+      params?.thread?.thread_id,
+      params?.turn?.threadId,
+      params?.turn?.thread_id,
+      eventObject?.threadId,
+      eventObject?.thread_id,
+      eventObject?.conversationId,
+      eventObject?.conversation_id,
+    ];
 
-  if (method === "thread/start" || method === "thread/started") {
-    return (
-      readString(params?.threadId)
-      || readString(params?.thread_id)
-      || readString(params?.thread?.id)
-      || readString(params?.thread?.threadId)
-      || readString(params?.thread?.thread_id)
-    );
-  }
-
-  if (method === "turn/completed") {
-    return (
-      readString(params?.threadId)
-      || readString(params?.thread_id)
-      || readString(params?.turn?.threadId)
-      || readString(params?.turn?.thread_id)
-    );
+    for (const candidate of candidates) {
+      const value = readString(candidate);
+      if (value) {
+        return value;
+      }
+    }
   }
 
   return null;
 }
 
 function extractTurnId(method, params) {
-  if (method === "turn/started" || method === "turn/completed") {
-    return (
-      readString(params?.turnId)
-      || readString(params?.turn_id)
-      || readString(params?.id)
-      || readString(params?.turn?.id)
-      || readString(params?.turn?.turnId)
-      || readString(params?.turn?.turn_id)
-    );
+  if (
+    method === "turn/started"
+    || method === "turn/completed"
+    || method === "turn/failed"
+    || isThreadStatusMethod(method)
+  ) {
+    const eventObject = envelopeEventObject(params);
+    const candidates = [
+      params?.turnId,
+      params?.turn_id,
+      params?.id,
+      params?.turn?.id,
+      params?.turn?.turnId,
+      params?.turn?.turn_id,
+      eventObject?.id,
+      eventObject?.turnId,
+      eventObject?.turn_id,
+      eventObject?.turn?.id,
+      eventObject?.turn?.turnId,
+      eventObject?.turn?.turn_id,
+    ];
+
+    for (const candidate of candidates) {
+      const value = readString(candidate);
+      if (value) {
+        return value;
+      }
+    }
   }
 
   return null;
+}
+
+// Shares one terminal-state mapping for runtime recycling so failed/stopped turns do not stay "active" forever.
+function applyTrackedTurnActivity(activeTurnKeysByThreadId, { source, context }) {
+  if (!context?.method) {
+    return;
+  }
+
+  if (!context.threadId && !context.turnId) {
+    return;
+  }
+
+  if (source === "phone" && context.method === "turn/start") {
+    if (context.threadId) {
+      activeTurnKeysByThreadId.set(context.threadId, context.threadId);
+    }
+    return;
+  }
+
+  if (source === "codex" && isTrackedTurnStartContext(context)) {
+    if (context.threadId) {
+      activeTurnKeysByThreadId.set(context.threadId, context.turnId || context.threadId);
+    }
+    return;
+  }
+
+  if (source === "codex" && isTrackedTurnTerminalContext(context)) {
+    if (context.threadId) {
+      activeTurnKeysByThreadId.delete(context.threadId);
+      return;
+    }
+
+    for (const [threadId, trackedKey] of activeTurnKeysByThreadId.entries()) {
+      if (trackedKey === context.turnId) {
+        activeTurnKeysByThreadId.delete(threadId);
+        break;
+      }
+    }
+  }
+}
+
+function isTrackedTurnStartContext(context) {
+  if (context.method === "turn/started") {
+    return true;
+  }
+
+  if (!isThreadStatusMethod(context.method)) {
+    return false;
+  }
+
+  return isActiveThreadStatusType(context.statusType);
+}
+
+function isTrackedTurnTerminalContext(context) {
+  if (context.method === "turn/completed" || context.method === "turn/failed") {
+    return true;
+  }
+
+  if (!isThreadStatusMethod(context.method)) {
+    return false;
+  }
+
+  return isTerminalThreadStatusType(context.statusType);
+}
+
+function isThreadStatusMethod(method) {
+  return method === "thread/status/changed"
+    || method === "thread/status"
+    || method === "codex/event/thread_status_changed";
+}
+
+function isActiveThreadStatusType(statusType) {
+  return statusType === "active"
+    || statusType === "running"
+    || statusType === "processing"
+    || statusType === "inprogress"
+    || statusType === "started"
+    || statusType === "pending";
+}
+
+function isTerminalThreadStatusType(statusType) {
+  return statusType.includes("cancel")
+    || statusType.includes("abort")
+    || statusType.includes("interrupt")
+    || statusType.includes("stop")
+    || statusType.includes("fail")
+    || statusType.includes("error")
+    || statusType === "idle"
+    || statusType === "notloaded"
+    || statusType === "completed"
+    || statusType === "done"
+    || statusType === "finished";
+}
+
+function extractStatusType(method, params) {
+  if (!isThreadStatusMethod(method)) {
+    return "";
+  }
+
+  const eventObject = envelopeEventObject(params);
+  const statusObject = objectValue(params?.status)
+    || objectValue(eventObject?.status)
+    || objectValue(params?.event?.status);
+  const rawStatus = readString(
+    statusObject?.type
+      || statusObject?.statusType
+      || statusObject?.status_type
+      || params?.status
+      || eventObject?.status
+      || params?.event?.status
+  );
+
+  return normalizeStatusType(rawStatus);
+}
+
+function objectValue(value) {
+  return value && typeof value === "object" ? value : null;
+}
+
+function normalizeStatusType(value) {
+  return typeof value === "string"
+    ? value.trim().toLowerCase().replace(/[\s_-]+/g, "")
+    : "";
 }
 
 function readString(value) {
@@ -617,4 +903,10 @@ function normalizeNonEmptyString(value) {
   return typeof value === "string" && value.trim() ? value.trim() : "";
 }
 
-module.exports = { startBridge };
+module.exports = {
+  applyTrackedTurnActivity,
+  extractBridgeMessageContext,
+  startBridge,
+  shouldRecycleCodexRuntimeForRelayFlapping,
+  trimRecentRelayDisconnects,
+};
