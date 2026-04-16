@@ -59,15 +59,10 @@ That starts:
 
 - a local relay
 - the local bridge
-- QR/bootstrap output for the current bridge flow
+- the local web client on port `5173`
+- pairing output for the browser PWA flow
 
-To run the new web client scaffold in parallel:
-
-```sh
-cd web
-npm install
-npm run dev
-```
+Open the printed browser URL on your phone, then paste the printed relay URL and pairing code into the page.
 
 ### npm Bridge Install
 

@@ -4,6 +4,17 @@ This directory contains the standalone React + Vite + TypeScript web client scaf
 
 ## Local Run
 
+For normal self-hosted testing, use the repo-root launcher so relay, bridge, and web all start together:
+
+```sh
+cd remodex
+./run-local-koder.sh --hostname 192.168.1.10
+```
+
+That prints the browser URL for your phone plus the relay URL and pairing code to paste into the PWA.
+
+If you only want the web client by itself:
+
 ```sh
 cd remodex/web
 npm install
@@ -23,7 +34,6 @@ npm run preview
 
 - React + Vite + TypeScript app shell
 - PWA manifest and a lightweight service worker
-- Koder-branded remote-coding UI scaffold
+- Koder-branded remote-coding UI
 - Responsive layout for sidebar, workspace, and session rail
-
-This is a front-end scaffold only. No bridge, relay, billing, or auth integration is wired yet.
+- Pairing, trusted reconnect, encrypted relay transport, threads, and send flow

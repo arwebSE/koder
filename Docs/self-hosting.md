@@ -55,14 +55,16 @@ What this does:
 
 - starts a local relay on your machine
 - starts the Koder bridge
-- prints a pairing QR code for first-time trust bootstrap or recovery
+- starts the local web client on port `5173`
+- prints the browser URL, relay URL, pairing code, and QR bootstrap payload
 
 Then:
 
-1. Open the iPhone app
-2. Scan the QR code from inside the app
-3. Start a thread and send a message
-4. On later launches, let the app try trusted reconnect before scanning again
+1. Open the printed browser URL on your phone
+2. Paste the printed relay URL and pairing code into the page
+3. Tap `Connect to Mac`
+4. Start a thread and send a message
+5. On later launches, use the trusted reconnect buttons before pairing again
 
 ### If your iPhone cannot reach the default hostname
 
