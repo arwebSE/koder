@@ -50,10 +50,10 @@ function setupRelay(
     const urlPath = req.url || "";
     const match = urlPath.match(/^\/relay\/([^/?]+)/);
     const sessionId = match?.[1];
-    const role = req.headers["x-role"];
+    const role = readRelayRole(req);
 
     if (!sessionId || (role !== "mac" && role !== "iphone")) {
-      ws.close(4000, "Missing sessionId or invalid x-role header");
+      ws.close(4000, "Missing sessionId or invalid relay role");
       return;
     }
 
@@ -507,6 +507,25 @@ function normalizeMacRegistration(registration, sessionId) {
     pairingVersion: normalizePositiveInteger(registration?.pairingVersion),
     pairingExpiresAt: normalizePositiveInteger(registration?.pairingExpiresAt),
   };
+}
+
+function readRelayRole(req) {
+  const headerRole = readHeaderString(req?.headers?.["x-role"]);
+  if (headerRole === "mac" || headerRole === "iphone") {
+    return headerRole;
+  }
+
+  try {
+    const url = new URL(req?.url || "", "http://relay.invalid");
+    const queryRole = readHeaderString(url.searchParams.get("role"));
+    if (queryRole === "mac" || queryRole === "iphone") {
+      return queryRole;
+    }
+  } catch {
+    return "";
+  }
+
+  return "";
 }
 
 function buildTrustedSessionResolveBytes({

@@ -1,51 +1,93 @@
-const highlights = [
-  "PWA-ready shell",
-  "Hosted and self-hosted modes",
-  "Remote code sessions, logs, and handoff"
-];
+import { FormEvent, KeyboardEvent, useEffect, useMemo, useState } from "react";
+import { KoderClient } from "./lib/client";
+import { parsePairingPayload } from "./lib/protocol";
+import type { ApprovalRequest, ClientSnapshot, ConversationMessage, TrustedMacRecord } from "./lib/types";
 
-const activity = [
-  {
-    label: "Live session",
-    value: "Connected",
-    tone: "good"
-  },
-  {
-    label: "Workspace",
-    value: "remodex / web",
-    tone: "neutral"
-  },
-  {
-    label: "Target",
-    value: "Hosted relay",
-    tone: "warn"
-  }
-];
-
-const threads = [
-  {
-    title: "Koder shell",
-    meta: "UI scaffold",
-    active: true
-  },
-  {
-    title: "Relay bridge",
-    meta: "Connection ready",
-    active: false
-  },
-  {
-    title: "Deployment mode",
-    meta: "Self-host free",
-    active: false
-  },
-  {
-    title: "Billing layer",
-    meta: "Hosted only",
-    active: false
-  }
-];
+const client = new KoderClient();
 
 function App() {
+  const [snapshot, setSnapshot] = useState<ClientSnapshot>(client.getSnapshot());
+  const [relayUrl, setRelayUrl] = useState(snapshot.connection.relayUrl || "ws://");
+  const [pairingCode, setPairingCode] = useState("");
+  const [pairingPayloadText, setPairingPayloadText] = useState("");
+  const [composerText, setComposerText] = useState("");
+  const [actionError, setActionError] = useState("");
+  const [activeAction, setActiveAction] = useState<string | null>(null);
+
+  useEffect(() => {
+    const unsubscribe = client.subscribe(setSnapshot);
+    return unsubscribe;
+  }, []);
+
+  useEffect(() => {
+    void client.restoreConnection().catch((error: Error) => {
+      setActionError(error.message);
+    });
+  }, []);
+
+  useEffect(() => {
+    if (!relayUrl.trim() && snapshot.connection.relayUrl) {
+      setRelayUrl(snapshot.connection.relayUrl);
+    }
+  }, [relayUrl, snapshot.connection.relayUrl]);
+
+  const activeMessages = useMemo(() => {
+    if (!snapshot.activeThreadId) {
+      return [];
+    }
+    return snapshot.messagesByThread[snapshot.activeThreadId] ?? [];
+  }, [snapshot.activeThreadId, snapshot.messagesByThread]);
+
+  const visibleError = actionError || snapshot.lastError;
+  const isConnected = snapshot.connection.phase === "connected";
+
+  async function runAction(actionLabel: string, action: () => Promise<void>) {
+    setActionError("");
+    setActiveAction(actionLabel);
+    try {
+      await action();
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : "Request failed.");
+    } finally {
+      setActiveAction(null);
+    }
+  }
+
+  function handlePairingCodeSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    void runAction("pair-code", async () => {
+      await client.connectWithPairingCode(relayUrl, pairingCode);
+      setPairingCode("");
+    });
+  }
+
+  function handlePairingPayloadSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    void runAction("pair-json", async () => {
+      const payload = parsePairingPayload(pairingPayloadText);
+      await client.connectWithPairingPayload(payload);
+      setPairingPayloadText("");
+    });
+  }
+
+  function handleSendSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    void runAction("send", async () => {
+      await client.sendMessage(composerText);
+      setComposerText("");
+    });
+  }
+
+  function handleComposerKeyDown(event: KeyboardEvent<HTMLTextAreaElement>) {
+    if ((event.metaKey || event.ctrlKey) && event.key === "Enter") {
+      event.preventDefault();
+      void runAction("send", async () => {
+        await client.sendMessage(composerText);
+        setComposerText("");
+      });
+    }
+  }
+
   return (
     <div className="app-shell">
       <div className="app-shell__glow app-shell__glow--one" />
@@ -55,118 +97,213 @@ function App() {
         <div className="brand">
           <div className="brand__mark">K</div>
           <div>
-            <p className="eyebrow">Remote coding client</p>
+            <p className="eyebrow">Self-hosted PWA</p>
             <h1>Koder</h1>
           </div>
         </div>
 
-        <div className="topbar__status">
-          <span className="status-dot status-dot--live" />
-          <span>Ready for hosted or self-hosted runs</span>
+        <div className={`topbar__status topbar__status--${snapshot.connection.phase}`}>
+          <span className={`status-dot status-dot--${statusTone(snapshot.connection.phase)}`} />
+          <div>
+            <strong>{snapshot.connection.label}</strong>
+            <span>{connectionSubline(snapshot)}</span>
+          </div>
         </div>
       </header>
 
       <main className="workspace">
         <aside className="sidebar card">
-          <div className="card__header">
-            <div>
-              <p className="eyebrow">Threads</p>
-              <h2>Session rail</h2>
+          <section className="sidebar__section">
+            <div className="card__header">
+              <div>
+                <p className="eyebrow">Connection</p>
+                <h2>Relay state</h2>
+              </div>
+              {isConnected ? (
+                <button
+                  type="button"
+                  className="chip chip--ghost"
+                  onClick={() => {
+                    void runAction("disconnect", () => client.disconnect({ preservePairing: true }));
+                  }}
+                >
+                  Disconnect
+                </button>
+              ) : null}
             </div>
-            <button type="button" className="chip chip--ghost">
-              New
-            </button>
-          </div>
 
-          <div className="thread-list">
-            {threads.map((thread) => (
+            <dl className="detail-list">
+              <div>
+                <dt>Secure state</dt>
+                <dd>{snapshot.connection.secureState}</dd>
+              </div>
+              <div>
+                <dt>Relay</dt>
+                <dd>{snapshot.connection.relayUrl || "None yet"}</dd>
+              </div>
+              <div>
+                <dt>Trusted Macs</dt>
+                <dd>{snapshot.trustedMacs.length}</dd>
+              </div>
+            </dl>
+          </section>
+
+          <section className="sidebar__section">
+            <div className="card__header">
+              <div>
+                <p className="eyebrow">Threads</p>
+                <h2>Session rail</h2>
+              </div>
               <button
-                key={thread.title}
                 type="button"
-                className={`thread ${thread.active ? "thread--active" : ""}`}
+                className="chip chip--primary"
+                disabled={!isConnected || activeAction === "new-thread"}
+                onClick={() => {
+                  void runAction("new-thread", async () => {
+                    const threadId = await client.createThread();
+                    await client.openThread(threadId);
+                  });
+                }}
               >
-                <div>
-                  <strong>{thread.title}</strong>
-                  <span>{thread.meta}</span>
-                </div>
-                <span className="thread__arrow">↗</span>
-              </button>
-            ))}
-          </div>
-
-          <div className="mini-panel">
-            <p className="eyebrow">Mode</p>
-            <div className="mode-switch" role="group" aria-label="Deployment mode">
-              <button type="button" className="mode-switch__button mode-switch__button--active">
-                Self-hosted
-              </button>
-              <button type="button" className="mode-switch__button">
-                Hosted
+                New
               </button>
             </div>
-          </div>
+
+            <div className="thread-list">
+              {snapshot.threads.length === 0 ? (
+                <p className="sidebar__empty">No threads yet. Pair a Mac and start one.</p>
+              ) : null}
+              {snapshot.threads.map((thread) => (
+                <button
+                  key={thread.id}
+                  type="button"
+                  className={`thread ${snapshot.activeThreadId === thread.id ? "thread--active" : ""}`}
+                  onClick={() => {
+                    void runAction(`thread:${thread.id}`, () => client.openThread(thread.id));
+                  }}
+                >
+                  <div className="thread__body">
+                    <strong>{thread.title}</strong>
+                    <span>{thread.preview || thread.subtitle || thread.cwd || thread.id}</span>
+                  </div>
+                  <span className="thread__time">{formatRelativeTime(thread.updatedAt)}</span>
+                </button>
+              ))}
+            </div>
+          </section>
         </aside>
 
         <section className="hero card">
-          <div className="hero__header">
-            <div>
-              <p className="eyebrow">Workspace</p>
-              <h2>Ship code from one browser surface.</h2>
-            </div>
-            <div className="pill">PWA ready</div>
-          </div>
-
-          <p className="hero__lede">
-            Koder is the web-first shell for remote coding sessions, relay state, and hosted
-            infrastructure when you want it.
-          </p>
-
-          <div className="highlight-row">
-            {highlights.map((item) => (
-              <div key={item} className="highlight-card">
-                <span className="highlight-card__dot" />
-                <span>{item}</span>
-              </div>
-            ))}
-          </div>
-
-          <div className="composer">
-            <div className="composer__chrome">
-              <span className="composer__label">Command</span>
-              <span className="composer__hint">/subagents, /plan, /git, /handoff</span>
-            </div>
-            <textarea
-              aria-label="Command composer"
-              defaultValue="Refactor the current session flow and keep the local bridge protocol stable."
+          {!isConnected ? (
+            <OnboardingPanel
+              relayUrl={relayUrl}
+              pairingCode={pairingCode}
+              pairingPayloadText={pairingPayloadText}
+              trustedMacs={snapshot.trustedMacs}
+              busyAction={activeAction}
+              onRelayUrlChange={setRelayUrl}
+              onPairingCodeChange={setPairingCode}
+              onPairingPayloadChange={setPairingPayloadText}
+              onPairingCodeSubmit={handlePairingCodeSubmit}
+              onPairingPayloadSubmit={handlePairingPayloadSubmit}
+              onReconnect={(macDeviceId) => {
+                void runAction(`reconnect:${macDeviceId}`, () => client.reconnectToTrustedMac(macDeviceId));
+              }}
+              onForget={(macDeviceId) => {
+                client.forgetReconnectCandidate(macDeviceId);
+              }}
             />
-            <div className="composer__actions">
-              <button type="button" className="chip">
-                Plan
-              </button>
-              <button type="button" className="chip">
-                Attach files
-              </button>
-              <button type="button" className="chip chip--primary">
-                Send to runtime
-              </button>
-            </div>
-          </div>
+          ) : (
+            <>
+              <div className="hero__header">
+                <div>
+                  <p className="eyebrow">Workspace</p>
+                  <h2>{snapshot.activeThreadId ? activeThreadTitle(snapshot) : "Open or start a thread"}</h2>
+                </div>
+                <div className="hero__meta">
+                  <span className="pill">Self-hosted</span>
+                  <button
+                    type="button"
+                    className="chip chip--ghost"
+                    onClick={() => {
+                      void runAction("refresh-threads", () => client.refreshThreads());
+                    }}
+                  >
+                    Refresh
+                  </button>
+                </div>
+              </div>
 
-          <div className="terminal card card--inner">
-            <div className="terminal__header">
-              <span>Runtime preview</span>
-              <span className="terminal__tag">web / relay / session</span>
-            </div>
-            <pre>{`$ koder session watch
-[relay] connected
-[hosted] monetization off for self-hosted mode
-[ui] shell loaded with PWA manifest
-[status] ready for the real app flow`}</pre>
-          </div>
+              <div className="message-pane">
+                {activeMessages.length === 0 ? (
+                  <div className="message-pane__empty">
+                    <p>No timeline yet.</p>
+                    <span>Send a message to verify the secure transport end to end.</span>
+                  </div>
+                ) : null}
+                {activeMessages.map((message) => (
+                  <MessageBubble key={message.id} message={message} />
+                ))}
+              </div>
+
+              {snapshot.pendingApprovals.length > 0 ? (
+                <section className="approval-stack">
+                  <div className="card__header">
+                    <div>
+                      <p className="eyebrow">Approvals</p>
+                      <h2>Bridge requests</h2>
+                    </div>
+                  </div>
+                  {snapshot.pendingApprovals.map((approval) => (
+                    <ApprovalCard
+                      key={approval.id}
+                      approval={approval}
+                      busyAction={activeAction}
+                      onDecision={(decision) => {
+                        void runAction(`approval:${approval.id}:${decision}`, () => (
+                          client.respondToApproval(approval.id, decision)
+                        ));
+                      }}
+                    />
+                  ))}
+                </section>
+              ) : null}
+
+              <form className="composer" onSubmit={handleSendSubmit}>
+                <div className="composer__chrome">
+                  <span className="composer__label">Prompt</span>
+                  <span className="composer__hint">Press Cmd/Ctrl+Enter to send</span>
+                </div>
+                <textarea
+                  aria-label="Prompt"
+                  placeholder="Ask the Mac to inspect code, run commands, or edit files."
+                  value={composerText}
+                  onChange={(event) => setComposerText(event.target.value)}
+                  onKeyDown={handleComposerKeyDown}
+                />
+                <div className="composer__actions">
+                  <button
+                    type="button"
+                    className="chip chip--ghost"
+                    onClick={() => setComposerText("")}
+                  >
+                    Clear
+                  </button>
+                  <button
+                    type="submit"
+                    className="chip chip--primary"
+                    disabled={!composerText.trim() || activeAction === "send"}
+                  >
+                    Send
+                  </button>
+                </div>
+              </form>
+            </>
+          )}
         </section>
 
         <aside className="rail">
-          <div className="card rail__panel">
+          <section className="card rail__panel">
             <div className="card__header">
               <div>
                 <p className="eyebrow">Health</p>
@@ -175,32 +312,300 @@ function App() {
             </div>
 
             <div className="stats">
-              {activity.map((item) => (
-                <div key={item.label} className={`stat stat--${item.tone}`}>
-                  <span>{item.label}</span>
-                  <strong>{item.value}</strong>
-                </div>
-              ))}
+              <div className={`stat stat--${statusTone(snapshot.connection.phase)}`}>
+                <span>Connection</span>
+                <strong>{snapshot.connection.phase}</strong>
+              </div>
+              <div className="stat stat--neutral">
+                <span>Active thread</span>
+                <strong>{snapshot.activeThreadId ? activeThreadTitle(snapshot) : "None"}</strong>
+              </div>
+              <div className="stat stat--warn">
+                <span>Pending approvals</span>
+                <strong>{snapshot.pendingApprovals.length}</strong>
+              </div>
             </div>
-          </div>
+          </section>
 
-          <div className="card rail__panel">
+          <section className="card rail__panel">
             <div className="card__header">
               <div>
-                <p className="eyebrow">Flow</p>
-                <h2>Product split</h2>
+                <p className="eyebrow">Pairing</p>
+                <h2>Phone flow</h2>
               </div>
             </div>
             <ul className="bullet-list">
-              <li>Self-hosted bridge stays free.</li>
-              <li>Hosted app carries the paid layer.</li>
-              <li>UI is ready for relay, auth, and billing hooks.</li>
+              <li>Run <code>./run-local-koder.sh --hostname &lt;your-mac-ip&gt;</code> on the Mac.</li>
+              <li>Use the printed advertised relay URL here, plus the pairing code.</li>
+              <li>After one successful pair, reconnect comes from the saved trusted Mac record.</li>
             </ul>
-          </div>
+          </section>
+
+          {visibleError ? (
+            <section className="card rail__panel rail__panel--error">
+              <div className="card__header">
+                <div>
+                  <p className="eyebrow">Last error</p>
+                  <h2>Needs attention</h2>
+                </div>
+                <button
+                  type="button"
+                  className="chip chip--ghost"
+                  onClick={() => setActionError("")}
+                >
+                  Clear
+                </button>
+              </div>
+              <p className="error-copy">{visibleError}</p>
+            </section>
+          ) : null}
         </aside>
       </main>
     </div>
   );
+}
+
+function OnboardingPanel(props: {
+  relayUrl: string;
+  pairingCode: string;
+  pairingPayloadText: string;
+  trustedMacs: TrustedMacRecord[];
+  busyAction: string | null;
+  onRelayUrlChange: (value: string) => void;
+  onPairingCodeChange: (value: string) => void;
+  onPairingPayloadChange: (value: string) => void;
+  onPairingCodeSubmit: (event: FormEvent<HTMLFormElement>) => void;
+  onPairingPayloadSubmit: (event: FormEvent<HTMLFormElement>) => void;
+  onReconnect: (macDeviceId: string) => void;
+  onForget: (macDeviceId: string) => void;
+}) {
+  return (
+    <div className="onboarding">
+      <div className="hero__header">
+        <div>
+          <p className="eyebrow">Onboarding</p>
+          <h2>Pair this browser with your self-hosted Mac.</h2>
+        </div>
+        <span className="pill">Manual pairing</span>
+      </div>
+
+      <p className="hero__lede">
+        Use the advertised relay URL and short pairing code printed by `./run-local-koder.sh`.
+        The browser stores its own device key locally, then reconnects through the trusted-session flow.
+      </p>
+
+      <div className="onboarding__grid">
+        <form className="setup-card" onSubmit={props.onPairingCodeSubmit}>
+          <div className="setup-card__header">
+            <p className="eyebrow">Fastest path</p>
+            <h3>Pair with code</h3>
+          </div>
+          <label className="field">
+            <span>Relay URL</span>
+            <input
+              value={props.relayUrl}
+              onChange={(event) => props.onRelayUrlChange(event.target.value)}
+              placeholder="ws://192.168.1.10:9000/relay"
+            />
+          </label>
+          <label className="field">
+            <span>Pairing code</span>
+            <input
+              value={props.pairingCode}
+              onChange={(event) => props.onPairingCodeChange(event.target.value)}
+              placeholder="RMX1:ABC123..."
+            />
+          </label>
+          <button
+            type="submit"
+            className="chip chip--primary chip--stretch"
+            disabled={!props.relayUrl.trim() || !props.pairingCode.trim() || props.busyAction === "pair-code"}
+          >
+            Connect to Mac
+          </button>
+        </form>
+
+        <form className="setup-card" onSubmit={props.onPairingPayloadSubmit}>
+          <div className="setup-card__header">
+            <p className="eyebrow">Fallback</p>
+            <h3>Paste QR payload JSON</h3>
+          </div>
+          <label className="field">
+            <span>Pairing payload</span>
+            <textarea
+              value={props.pairingPayloadText}
+              onChange={(event) => props.onPairingPayloadChange(event.target.value)}
+              placeholder='{"v":2,"relay":"ws://.../relay","sessionId":"..."}'
+            />
+          </label>
+          <button
+            type="submit"
+            className="chip chip--ghost chip--stretch"
+            disabled={!props.pairingPayloadText.trim() || props.busyAction === "pair-json"}
+          >
+            Use QR payload
+          </button>
+        </form>
+      </div>
+
+      <section className="trusted-grid">
+        <div className="card__header">
+          <div>
+            <p className="eyebrow">Reconnect</p>
+            <h2>Trusted Macs</h2>
+          </div>
+        </div>
+
+        {props.trustedMacs.length === 0 ? (
+          <p className="sidebar__empty">No trusted Macs yet. Complete one pairing first.</p>
+        ) : null}
+
+        {props.trustedMacs.map((mac) => (
+          <article key={mac.macDeviceId} className="trusted-card">
+            <div>
+              <strong>{mac.displayName || mac.macDeviceId.slice(0, 8)}</strong>
+              <span>{mac.relayURL || "No relay URL saved"}</span>
+            </div>
+            <div className="trusted-card__actions">
+              <button
+                type="button"
+                className="chip chip--primary"
+                disabled={!mac.relayURL || props.busyAction === `reconnect:${mac.macDeviceId}`}
+                onClick={() => props.onReconnect(mac.macDeviceId)}
+              >
+                Reconnect
+              </button>
+              <button
+                type="button"
+                className="chip chip--ghost"
+                onClick={() => props.onForget(mac.macDeviceId)}
+              >
+                Forget
+              </button>
+            </div>
+          </article>
+        ))}
+      </section>
+    </div>
+  );
+}
+
+function MessageBubble({ message }: { message: ConversationMessage }) {
+  return (
+    <article className={`message message--${message.role} message--${message.kind}`}>
+      <header className="message__header">
+        <span>{messageLabel(message)}</span>
+        <span>{formatClockTime(message.createdAt)}</span>
+      </header>
+      <div className="message__body">
+        <pre>{message.text || (message.isStreaming ? "…" : "")}</pre>
+      </div>
+      {message.role === "user" ? (
+        <footer className={`message__footer message__footer--${message.deliveryState}`}>
+          {message.deliveryState}
+        </footer>
+      ) : null}
+    </article>
+  );
+}
+
+function ApprovalCard(props: {
+  approval: ApprovalRequest;
+  busyAction: string | null;
+  onDecision: (decision: "accept" | "reject") => void;
+}) {
+  return (
+    <article className="approval-card">
+      <div className="approval-card__copy">
+        <strong>{props.approval.method}</strong>
+        <p>{props.approval.reason || props.approval.command || "Bridge approval required."}</p>
+      </div>
+      <div className="approval-card__actions">
+        <button
+          type="button"
+          className="chip chip--ghost"
+          disabled={Boolean(props.busyAction?.startsWith(`approval:${props.approval.id}:`))}
+          onClick={() => props.onDecision("reject")}
+        >
+          Deny
+        </button>
+        <button
+          type="button"
+          className="chip chip--primary"
+          disabled={Boolean(props.busyAction?.startsWith(`approval:${props.approval.id}:`))}
+          onClick={() => props.onDecision("accept")}
+        >
+          Accept
+        </button>
+      </div>
+    </article>
+  );
+}
+
+function activeThreadTitle(snapshot: ClientSnapshot): string {
+  return snapshot.threads.find((thread) => thread.id === snapshot.activeThreadId)?.title ?? "Thread";
+}
+
+function connectionSubline(snapshot: ClientSnapshot): string {
+  if (snapshot.connection.macName) {
+    return `${snapshot.connection.macName} · ${snapshot.connection.relayUrl || "no relay saved"}`;
+  }
+  return snapshot.connection.relayUrl || "No relay paired yet";
+}
+
+function statusTone(phase: ClientSnapshot["connection"]["phase"]): "good" | "warn" | "neutral" | "bad" {
+  switch (phase) {
+    case "connected":
+      return "good";
+    case "connecting":
+    case "restoring":
+      return "warn";
+    case "error":
+      return "bad";
+    default:
+      return "neutral";
+  }
+}
+
+function messageLabel(message: ConversationMessage): string {
+  if (message.role === "assistant" && message.isStreaming) {
+    return "Assistant · streaming";
+  }
+  return `${message.role} · ${message.kind}`;
+}
+
+function formatRelativeTime(value: string | null): string {
+  if (!value) {
+    return "";
+  }
+  const timestamp = Date.parse(value);
+  if (!Number.isFinite(timestamp)) {
+    return "";
+  }
+
+  const deltaMinutes = Math.round((Date.now() - timestamp) / 60_000);
+  if (deltaMinutes < 1) {
+    return "now";
+  }
+  if (deltaMinutes < 60) {
+    return `${deltaMinutes}m`;
+  }
+  const deltaHours = Math.round(deltaMinutes / 60);
+  if (deltaHours < 24) {
+    return `${deltaHours}h`;
+  }
+  return `${Math.round(deltaHours / 24)}d`;
+}
+
+function formatClockTime(value: string): string {
+  const timestamp = Date.parse(value);
+  if (!Number.isFinite(timestamp)) {
+    return "";
+  }
+  return new Intl.DateTimeFormat(undefined, {
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(new Date(timestamp));
 }
 
 export default App;

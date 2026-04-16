@@ -32,6 +32,32 @@ test("health is minimal by default and detailed only when enabled", async () => 
   assert.equal(detailed.push.enabled, false);
 });
 
+test("browser pairing endpoints advertise CORS and answer preflight requests", async () => {
+  await withServer(async ({ port }) => {
+    const preflight = await fetch(`http://127.0.0.1:${port}/v1/pairing/code/resolve`, {
+      method: "OPTIONS",
+      headers: {
+        origin: "http://localhost:5173",
+        "access-control-request-method": "POST",
+        "access-control-request-headers": "content-type",
+      },
+    });
+
+    assert.equal(preflight.status, 204);
+    assert.equal(preflight.headers.get("access-control-allow-origin"), "*");
+    assert.match(preflight.headers.get("access-control-allow-methods") || "", /POST/);
+    assert.match(preflight.headers.get("access-control-allow-headers") || "", /content-type/);
+
+    const response = await fetch(`http://127.0.0.1:${port}/v1/trusted/session/resolve`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({}),
+    });
+
+    assert.equal(response.headers.get("access-control-allow-origin"), "*");
+  });
+});
+
 test("push routes stay disabled until explicitly enabled", async () => {
   const { body, status } = await withServer(async ({ port }) => {
     const response = await fetch(`http://127.0.0.1:${port}/v1/push/session/register-device`, {
@@ -544,6 +570,25 @@ test("websocket relay forwards between mac and iphone on the base relay path", a
     });
     mac.send(JSON.stringify({ ok: true }));
     assert.equal(await received, "{\"ok\":true}");
+
+    const macClosed = onceClosed(mac);
+    const iphoneClosed = onceClosed(iphone);
+    mac.close();
+    iphone.close();
+    await Promise.all([macClosed, iphoneClosed]);
+  });
+});
+
+test("websocket relay accepts browser-style role query parameters", async () => {
+  await withServer(async ({ port }) => {
+    const mac = new WebSocket(`ws://127.0.0.1:${port}/relay/session-query-role?role=mac`);
+    const iphone = new WebSocket(`ws://127.0.0.1:${port}/relay/session-query-role?role=iphone`);
+
+    await Promise.all([onceOpen(mac), onceOpen(iphone)]);
+
+    const received = onceMessage(iphone);
+    mac.send(JSON.stringify({ browser: true }));
+    assert.equal(await received, "{\"browser\":true}");
 
     const macClosed = onceClosed(mac);
     const iphoneClosed = onceClosed(iphone);

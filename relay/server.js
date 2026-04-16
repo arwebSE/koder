@@ -96,7 +96,14 @@ async function handleHTTPRequest(req, res, {
   pushSessionService,
   trustProxy,
 }) {
+  applyCORSHeaders(res);
   const pathname = safePathname(req.url);
+  if (req.method === "OPTIONS") {
+    res.statusCode = 204;
+    res.end();
+    return;
+  }
+
   if (req.method === "GET" && pathname === "/health") {
     return writeJSON(
       res,
@@ -213,6 +220,13 @@ function writeJSON(res, status, body) {
   res.statusCode = status;
   res.setHeader("content-type", "application/json");
   res.end(JSON.stringify(body));
+}
+
+function applyCORSHeaders(res) {
+  res.setHeader("access-control-allow-origin", "*");
+  res.setHeader("access-control-allow-methods", "GET,POST,OPTIONS");
+  res.setHeader("access-control-allow-headers", "content-type");
+  res.setHeader("access-control-max-age", "86400");
 }
 
 function writeRateLimitResponse(res) {
