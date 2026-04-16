@@ -1,0 +1,13 @@
+{
+  "name": "remodex-relay",
+  "private": true,
+  "type": "commonjs",
+  "description": "Koder relay server for local-first and hosted deployments.",
+  "scripts": {
+    "start": "node ./server.js",
+    "test": "node --test ./*.test.js"
+  },
+  "dependencies": {
+    "ws": "^8.19.0"
+  }
+}

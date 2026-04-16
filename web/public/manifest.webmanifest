@@ -1,0 +1,18 @@
+{
+  "name": "Koder",
+  "short_name": "Koder",
+  "description": "Remote coding client with a PWA-ready web shell.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#08101c",
+  "theme_color": "#0a1020",
+  "icons": [
+    {
+      "src": "/pwa-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

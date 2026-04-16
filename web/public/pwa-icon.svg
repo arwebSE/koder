@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Koder icon">
+  <defs>
+    <linearGradient id="g" x1="64" y1="64" x2="448" y2="448" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#ff9f43"/>
+      <stop offset="0.45" stop-color="#7cf7d4"/>
+      <stop offset="1" stop-color="#6b7bff"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="120" fill="#07101d"/>
+  <path d="M112 160h66v79l97-79h86L244 256l117 96h-86l-97-79v79h-66V160Z" fill="url(#g)"/>
+  <rect x="92" y="92" width="328" height="328" rx="92" fill="none" stroke="url(#g)" stroke-width="8" opacity="0.55"/>
+</svg>
