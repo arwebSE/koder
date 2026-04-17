@@ -6,7 +6,7 @@ This is the single repo-local agent guidance file for this project. Do not recre
 
 - Koder is **web-first** now.
 - `web/` is the active client direction.
-- `phodex-bridge/` and `relay/` are the current operational core.
+- `bridge/` and `relay/` are the current operational core.
 - Default assumption: the active product is fully self-hosted and free.
 
 ## Core Guardrails
@@ -23,7 +23,7 @@ This is the single repo-local agent guidance file for this project. Do not recre
 - Keep README honest about current maturity.
 - Do not present the web client as less complete than it is.
 - Present `koder` as the preferred CLI name.
-- Mention `remodex` only where legacy package or compatibility details still matter.
+- Keep naming consistent with Koder across new docs and code.
 - Use the current repo path `arwebSE/koder` in new docs when a clone URL is needed.
 
 ## Security and Privacy Guardrails
@@ -56,7 +56,7 @@ If you touch `web/`:
 Bridge:
 
 ```sh
-cd phodex-bridge
+cd bridge
 npm install
 npm start
 ```

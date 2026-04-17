@@ -4,11 +4,19 @@
 # Purpose: Starts the local relay, bridge, and web client for one-command self-hosted testing.
 # Layer: developer utility
 # Exports: none
-# Depends on: ./run-local-remodex.sh, web/package.json
+# Depends on: ./run-local-bridge.sh, web/package.json
 
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+COMMON_SH="${SCRIPT_DIR}/scripts/local-dev/common.sh"
+[[ -f "${COMMON_SH}" ]] || {
+  printf '[run-local-koder] Missing shared launcher helpers: %s\n' "${COMMON_SH}" >&2
+  exit 1
+}
+# shellcheck source=./scripts/local-dev/common.sh
+source "${COMMON_SH}"
+
 WEB_DIR="${SCRIPT_DIR}/web"
 WEB_PORT="${WEB_PORT:-5173}"
 WEB_LOG_FILE="${TMPDIR:-/tmp}/koder-web-dev.log"
@@ -17,17 +25,18 @@ WEB_CERT_KEY=""
 WEB_CERT_CERT=""
 RELAY_HOSTNAME=""
 RELAY_PORT="${RELAY_PORT:-9000}"
-REMODEX_PID=""
+KODER_PID=""
 WEB_PID=""
+FORWARDED_ARGS=()
 
 cleanup() {
   if [[ -n "${WEB_PID}" ]] && kill -0 "${WEB_PID}" 2>/dev/null; then
     kill "${WEB_PID}" 2>/dev/null || true
     wait "${WEB_PID}" 2>/dev/null || true
   fi
-  if [[ -n "${REMODEX_PID}" ]] && kill -0 "${REMODEX_PID}" 2>/dev/null; then
-    kill "${REMODEX_PID}" 2>/dev/null || true
-    wait "${REMODEX_PID}" 2>/dev/null || true
+  if [[ -n "${KODER_PID}" ]] && kill -0 "${KODER_PID}" 2>/dev/null; then
+    kill "${KODER_PID}" 2>/dev/null || true
+    wait "${KODER_PID}" 2>/dev/null || true
   fi
 }
 
@@ -40,45 +49,57 @@ die() {
   exit 1
 }
 
+usage() {
+  cat <<'EOF'
+Usage: ./run-local-koder.sh [options]
+
+Options:
+  --ip HOSTNAME         Alias for --hostname
+  --hostname HOSTNAME   Hostname or IP the browser client should use to reach this machine
+  --port PORT           Relay port to listen on
+  --help                Show this help text
+
+Environment:
+  WEB_PORT              HTTPS dev-server port (default: 5173)
+EOF
+}
+
 parse_args() {
   while [[ $# -gt 0 ]]; do
     case "$1" in
       --ip)
-        shift
-        [[ $# -gt 0 ]] || die "--ip requires a value"
-        RELAY_HOSTNAME="$1"
+        require_value "--ip" "$#" || die "--ip requires a value"
+        RELAY_HOSTNAME="$2"
+        FORWARDED_ARGS+=("--hostname" "$2")
+        shift 2
         ;;
       --hostname)
-        shift
-        [[ $# -gt 0 ]] || die "--hostname requires a value"
-        RELAY_HOSTNAME="$1"
+        require_value "--hostname" "$#" || die "--hostname requires a value"
+        RELAY_HOSTNAME="$2"
+        FORWARDED_ARGS+=("$1" "$2")
+        shift 2
         ;;
       --port)
+        require_value "--port" "$#" || die "--port requires a value"
+        RELAY_PORT="$2"
+        FORWARDED_ARGS+=("$1" "$2")
+        shift 2
+        ;;
+      --help)
+        usage
+        exit 0
+        ;;
+      *)
+        FORWARDED_ARGS+=("$1")
         shift
-        [[ $# -gt 0 ]] || die "--port requires a value"
-        RELAY_PORT="$1"
         ;;
     esac
-    shift || true
   done
-}
-
-default_hostname() {
-  local host_name
-  host_name="$(hostname 2>/dev/null || true)"
-  if [[ -n "${host_name}" ]]; then
-    printf '%s' "${host_name}"
-    return
-  fi
-  printf 'localhost'
 }
 
 ensure_web_dependencies() {
   [[ -d "${WEB_DIR}" ]] || die "Missing web client directory: ${WEB_DIR}"
-  if [[ ! -d "${WEB_DIR}/node_modules" ]]; then
-    log "Installing web dependencies in ${WEB_DIR}"
-    (cd "${WEB_DIR}" && npm install)
-  fi
+  ensure_package_dependencies "${WEB_DIR}" "[run-local-koder]" || die "Failed to install web dependencies."
 }
 
 ensure_web_port_available() {
@@ -194,14 +215,20 @@ if [[ -z "${RELAY_HOSTNAME}" ]]; then
   RELAY_HOSTNAME="$(default_hostname)"
 fi
 
+require_command node || die "Missing required command: node"
+require_command npm || die "Missing required command: npm"
+require_command curl || die "Missing required command: curl"
+require_command openssl || die "openssl is required to generate the local HTTPS certificate."
+ensure_node_version || die "Please use Node.js 18 or newer."
+
 ensure_web_dependencies
 ensure_web_port_available
 ensure_local_https_certificate
 start_web
 wait_for_web
 
-print_web_summary "${RELAY_HOSTNAME}" "${RELAY_PORT}"
+print_web_summary "${RELAY_HOSTNAME}"
 
-"${SCRIPT_DIR}/run-local-remodex.sh" "$@" &
-REMODEX_PID=$!
-wait "${REMODEX_PID}"
+"${SCRIPT_DIR}/run-local-bridge.sh" "${FORWARDED_ARGS[@]}" &
+KODER_PID=$!
+wait "${KODER_PID}"

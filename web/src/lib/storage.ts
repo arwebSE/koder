@@ -73,7 +73,7 @@ export function createRelaySessionRecord(payload: {
   sessionId: string;
   macDeviceId: string;
   macIdentityPublicKey: string;
-  shouldForceQRBootstrapOnNextHandshake: boolean;
+  shouldForceBootstrapOnNextHandshake: boolean;
 }): PersistedRelaySession {
   return {
     relayUrl: payload.relayUrl,
@@ -82,7 +82,7 @@ export function createRelaySessionRecord(payload: {
     macIdentityPublicKey: payload.macIdentityPublicKey,
     protocolVersion: 1,
     lastAppliedBridgeOutboundSeq: 0,
-    shouldForceQRBootstrapOnNextHandshake: payload.shouldForceQRBootstrapOnNextHandshake,
+    shouldForceBootstrapOnNextHandshake: payload.shouldForceBootstrapOnNextHandshake,
   };
 }
 
@@ -171,6 +171,9 @@ function normalizeRelaySession(value: Partial<PersistedRelaySession> | null | un
   if (!value || typeof value !== "object") {
     return null;
   }
+  const legacyValue = value as Partial<PersistedRelaySession> & {
+    shouldForceQRBootstrapOnNextHandshake?: boolean;
+  };
 
   const relayUrl = normalizeString(value.relayUrl);
   const sessionId = normalizeString(value.sessionId);
@@ -189,7 +192,9 @@ function normalizeRelaySession(value: Partial<PersistedRelaySession> | null | un
     lastAppliedBridgeOutboundSeq: Number.isInteger(value.lastAppliedBridgeOutboundSeq)
       ? Number(value.lastAppliedBridgeOutboundSeq)
       : 0,
-    shouldForceQRBootstrapOnNextHandshake: value.shouldForceQRBootstrapOnNextHandshake !== false,
+    shouldForceBootstrapOnNextHandshake:
+      value.shouldForceBootstrapOnNextHandshake !== false
+      && legacyValue.shouldForceQRBootstrapOnNextHandshake !== false,
   };
 }
 

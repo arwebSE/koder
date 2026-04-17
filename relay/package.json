@@ -1,5 +1,5 @@
 {
-  "name": "remodex-relay",
+  "name": "koder-relay",
   "private": true,
   "type": "commonjs",
   "description": "Koder relay server for local-first and hosted deployments.",

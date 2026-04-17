@@ -4,7 +4,6 @@ import { hkdf } from "@noble/hashes/hkdf";
 import { sha256 } from "@noble/hashes/sha2";
 import {
   buildSelfHostedBootstrapUrl,
-  buildPairingCodeResolveUrl,
   buildRelaySocketUrl,
   buildTrustedSessionResolveUrl,
   notificationText,
@@ -216,7 +215,7 @@ export class KoderClient {
         sessionId: payload.sessionId,
         macDeviceId: payload.macDeviceId,
         macIdentityPublicKey: payload.macIdentityPublicKey,
-        shouldForceQRBootstrapOnNextHandshake: true,
+        shouldForceBootstrapOnNextHandshake: true,
       });
       draft.trustedMacRegistry[payload.macDeviceId] = {
         ...createTrustedMacRecord(
@@ -246,46 +245,13 @@ export class KoderClient {
         sessionId: payload.sessionId,
         macDeviceId: payload.macDeviceId,
         macIdentityPublicKey: payload.macIdentityPublicKey,
-        shouldForceQRBootstrapOnNextHandshake: true,
+        shouldForceBootstrapOnNextHandshake: true,
       });
       return draft;
     });
 
     this.syncTrustedMacs();
     await this.connectWithSavedSession();
-  }
-
-  async connectWithPairingCode(relayUrl: string, code: string): Promise<void> {
-    const resolveUrl = buildPairingCodeResolveUrl(relayUrl);
-    const normalizedCode = code.trim().toUpperCase().replace(/^RMX1:/, "").replace(/[^A-Z0-9]/g, "");
-    if (!normalizedCode) {
-      throw new Error("Enter a valid pairing code.");
-    }
-
-    const response = await postJSON<{
-      ok?: boolean;
-      v?: number;
-      sessionId?: string;
-      macDeviceId?: string;
-      macIdentityPublicKey?: string;
-      expiresAt?: number;
-      error?: string;
-      code?: string;
-    }>(resolveUrl, { code: normalizedCode }, {
-      timeoutMs: HTTP_REQUEST_TIMEOUT_MS,
-      timeoutMessage: "Timed out while resolving the pairing code. Check the relay URL or scan a fresh QR.",
-    });
-
-    const payload = validatePairingPayload({
-      v: response.v,
-      relay: relayUrl,
-      sessionId: response.sessionId,
-      macDeviceId: response.macDeviceId,
-      macIdentityPublicKey: response.macIdentityPublicKey,
-      expiresAt: response.expiresAt,
-    });
-
-    await this.connectWithPairingPayload(payload);
   }
 
   async reconnectToTrustedMac(macDeviceId?: string, options: { quiet?: boolean } = {}): Promise<void> {
@@ -318,7 +284,7 @@ export class KoderClient {
           sessionId: resolved.sessionId,
           macDeviceId: resolved.macDeviceId,
           macIdentityPublicKey: resolved.macIdentityPublicKey,
-          shouldForceQRBootstrapOnNextHandshake: false,
+          shouldForceBootstrapOnNextHandshake: false,
         });
         const existing = draft.trustedMacRegistry[resolved.macDeviceId] ?? createTrustedMacRecord(
           resolved.macDeviceId,
@@ -366,8 +332,8 @@ export class KoderClient {
     }
     this.setConnection({
       phase: "connecting",
-      secureState: relaySession.shouldForceQRBootstrapOnNextHandshake ? "handshaking" : "reconnecting",
-      label: relaySession.shouldForceQRBootstrapOnNextHandshake
+      secureState: relaySession.shouldForceBootstrapOnNextHandshake ? "handshaking" : "reconnecting",
+      label: relaySession.shouldForceBootstrapOnNextHandshake
         ? "Pairing securely..."
         : "Connecting to trusted Mac...",
       relayUrl: relaySession.relayUrl,
@@ -657,9 +623,9 @@ export class KoderClient {
     }
 
     const trustedMac = this.persistedState.trustedMacRegistry[relaySession.macDeviceId];
-    const handshakeMode = (!relaySession.shouldForceQRBootstrapOnNextHandshake && trustedMac)
+    const handshakeMode = (!relaySession.shouldForceBootstrapOnNextHandshake && trustedMac)
       ? "trusted_reconnect"
-      : "qr_bootstrap";
+      : "bootstrap";
     const expectedMacIdentityPublicKey = handshakeMode === "trusted_reconnect"
       ? trustedMac?.macIdentityPublicKey ?? ""
       : relaySession.macIdentityPublicKey;
@@ -751,14 +717,14 @@ export class KoderClient {
       nextOutboundCounter: 0,
     };
 
-    if (handshakeMode === "qr_bootstrap") {
+    if (handshakeMode === "bootstrap") {
       this.persistedState = updatePersistedState(this.persistedState, (draft) => {
         draft.relaySession = createRelaySessionRecord({
           relayUrl: relaySession.relayUrl,
           sessionId: relaySession.sessionId,
           macDeviceId: serverHello.macDeviceId,
           macIdentityPublicKey: serverHello.macIdentityPublicKey,
-          shouldForceQRBootstrapOnNextHandshake: false,
+          shouldForceBootstrapOnNextHandshake: false,
         });
         draft.trustedMacRegistry[serverHello.macDeviceId] = {
           ...createTrustedMacRecord(
@@ -777,7 +743,7 @@ export class KoderClient {
     } else {
       this.persistedState = updatePersistedState(this.persistedState, (draft) => {
         if (draft.relaySession) {
-          draft.relaySession.shouldForceQRBootstrapOnNextHandshake = false;
+          draft.relaySession.shouldForceBootstrapOnNextHandshake = false;
         }
         if (draft.trustedMacRegistry[serverHello.macDeviceId]) {
           draft.trustedMacRegistry[serverHello.macDeviceId].lastUsedAt = new Date().toISOString();
@@ -848,7 +814,7 @@ export class KoderClient {
         signature: bytesToBase64(signature),
       }, {
         timeoutMs: HTTP_REQUEST_TIMEOUT_MS,
-        timeoutMessage: "Timed out while contacting the trusted Mac relay. Try reconnecting once, then scan a fresh QR if it keeps stalling.",
+        timeoutMessage: "Timed out while contacting the trusted Mac relay. Try reconnecting once, then refresh the bootstrap details if it keeps stalling.",
       });
     } catch (error) {
       if (isCodedError(error, "phone_not_trusted") || isCodedError(error, "invalid_signature")) {
@@ -1702,7 +1668,7 @@ function wireMessageKind(text: string): string {
 function buildSecureTranscriptBytes(payload: {
   sessionId: string;
   protocolVersion: number;
-  handshakeMode: "qr_bootstrap" | "trusted_reconnect";
+  handshakeMode: "bootstrap" | "trusted_reconnect";
   keyEpoch: number;
   macDeviceId: string;
   phoneDeviceId: string;

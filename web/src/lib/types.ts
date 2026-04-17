@@ -31,7 +31,7 @@ export interface PersistedRelaySession {
   macIdentityPublicKey: string;
   protocolVersion: number;
   lastAppliedBridgeOutboundSeq: number;
-  shouldForceQRBootstrapOnNextHandshake: boolean;
+  shouldForceBootstrapOnNextHandshake: boolean;
 }
 
 export interface PersistedState {
@@ -133,7 +133,7 @@ export interface SecureClientHello {
   kind: "clientHello";
   protocolVersion: number;
   sessionId: string;
-  handshakeMode: "qr_bootstrap" | "trusted_reconnect";
+  handshakeMode: "bootstrap" | "trusted_reconnect";
   phoneDeviceId: string;
   phoneIdentityPublicKey: string;
   phoneEphemeralPublicKey: string;
@@ -144,7 +144,7 @@ export interface SecureServerHello {
   kind: "serverHello";
   protocolVersion: number;
   sessionId: string;
-  handshakeMode: "qr_bootstrap" | "trusted_reconnect";
+  handshakeMode: "bootstrap" | "trusted_reconnect";
   macDeviceId: string;
   macIdentityPublicKey: string;
   macEphemeralPublicKey: string;

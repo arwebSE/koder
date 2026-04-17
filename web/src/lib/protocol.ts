@@ -13,10 +13,10 @@ interface ThreadListPage {
   hasMore: boolean;
 }
 
-export const PAIRING_QR_VERSION = 2;
+export const PAIRING_PAYLOAD_VERSION = 2;
 export const SECURE_PROTOCOL_VERSION = 1;
-export const SECURE_HANDSHAKE_TAG = "remodex-e2ee-v1";
-export const TRUSTED_SESSION_RESOLVE_TAG = "remodex-trusted-session-resolve-v1";
+export const SECURE_HANDSHAKE_TAG = "koder-e2ee-v1";
+export const TRUSTED_SESSION_RESOLVE_TAG = "koder-trusted-session-resolve-v1";
 
 export function parsePairingPayload(raw: string): PairingPayload {
   const parsed = JSON.parse(raw) as Partial<PairingPayload>;
@@ -34,7 +34,7 @@ export function validatePairingPayload(value: Partial<PairingPayload>): PairingP
   if (!relay || !sessionId || !macDeviceId || !macIdentityPublicKey) {
     throw new Error("The pairing payload is missing required fields.");
   }
-  if (version !== PAIRING_QR_VERSION) {
+  if (version !== PAIRING_PAYLOAD_VERSION) {
     throw new Error("This pairing payload uses an unsupported version.");
   }
   if (!Number.isFinite(expiresAt) || Date.now() > expiresAt) {
@@ -62,12 +62,6 @@ export function normalizePairingCode(input: string): string {
 export function buildRelaySocketUrl(relayUrl: string, sessionId: string, role: "mac" | "iphone"): string {
   const url = new URL(`${relayUrl.replace(/\/+$/, "")}/${encodeURIComponent(sessionId)}`);
   url.searchParams.set("role", role);
-  return url.toString();
-}
-
-export function buildPairingCodeResolveUrl(relayUrl: string): string {
-  const url = normalizeRelayHttpUrl(relayUrl);
-  url.pathname = `${relayPathPrefix(url.pathname)}/v1/pairing/code/resolve`;
   return url.toString();
 }
 

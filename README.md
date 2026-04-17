@@ -13,7 +13,7 @@ Koder is a local-first remote client for [Codex](https://openai.com/index/codex/
 Be precise about the current state:
 
 - `web/` is the new primary direction and now works as the self-hosted React + Vite + TypeScript PWA client.
-- `phodex-bridge/` and `relay/` are the working backend pieces that drive session routing and the local Codex bridge.
+- `bridge/` and `relay/` are the working backend pieces that drive session routing and the local Codex bridge.
 
 That means Koder is now **web-first in both roadmap and active self-hosted usage**.
 
@@ -34,11 +34,9 @@ See [Docs/KODER_PRODUCT_SPEC.md](Docs/KODER_PRODUCT_SPEC.md) for the current wor
 
 ```text
 .
-├── phodex-bridge/   Node bridge package and CLI (`koder`, legacy `remodex`)
+├── bridge/          Node bridge package and CLI (`koder`)
 ├── relay/           Self-hostable relay and optional push service
 ├── web/             React + Vite + TypeScript PWA client
-├── Docs/            Product notes and self-hosting docs
-└── Legal/           Privacy policy and terms from the older app era
 ```
 
 ## Quick Start
@@ -62,22 +60,20 @@ Open the printed browser URL on your phone over HTTPS. The launcher serves the P
 
 ### npm Bridge Install
 
-The package is still published under `remodex` during the transition, but it exposes a `koder` command alias.
+Install the bridge CLI as `koder`.
 
 ```sh
-npm install -g remodex@latest
+npm install -g koder@latest
 koder up
 ```
-
-The legacy CLI alias still works too.
 
 ## Architecture
 
 ```text
 ┌──────────────┐      paired session      ┌───────────────┐      JSON-RPC / stdio      ┌─────────────┐
 │  Koder Web   │ ◄──────────────────────► │ koder bridge  │ ◄────────────────────────► │ codex       │
-│              │      via relay           │ on your Mac   │                             │ app-server  │
-└──────────────┘                          └───────────────┘                             └─────────────┘
+│              │      via relay           │ on your Mac   │                            │ app-server  │
+└──────────────┘                          └───────────────┘                            └─────────────┘
                                                   │
                                                   ▼
                                            ┌─────────────┐
@@ -124,29 +120,29 @@ The preferred CLI name is `koder`.
 
 Important variables:
 
-| Variable | Purpose |
-| --- | --- |
-| `REMODEX_RELAY` | Relay URL for bridge session routing |
-| `REMODEX_ADVERTISED_RELAY` | Relay URL advertised to clients when the bridge connects on a different local socket |
-| `REMODEX_PUSH_SERVICE_URL` | Optional push HTTP base URL |
-| `REMODEX_CODEX_ENDPOINT` | Connect to an existing Codex WebSocket instead of spawning `codex app-server` |
-| `REMODEX_REFRESH_ENABLED` | Enables the desktop refresh workaround |
-| `REMODEX_REFRESH_DEBOUNCE_MS` | Debounce window for refresh events |
-| `REMODEX_REFRESH_COMMAND` | Custom refresh command |
-| `REMODEX_CODEX_BUNDLE_ID` | Bundle ID for the Codex desktop app |
-| `CODEX_HOME` | Codex data directory |
+| Variable                      | Purpose                                                                              |
+| ----------------------------- | ------------------------------------------------------------------------------------ |
+| `KODER_RELAY`               | Relay URL for bridge session routing                                                 |
+| `KODER_ADVERTISED_RELAY`    | Relay URL advertised to clients when the bridge connects on a different local socket |
+| `KODER_PUSH_SERVICE_URL`    | Optional push HTTP base URL                                                          |
+| `KODER_CODEX_ENDPOINT`      | Connect to an existing Codex WebSocket instead of spawning `codex app-server`        |
+| `KODER_REFRESH_ENABLED`     | Enables the desktop refresh workaround                                               |
+| `KODER_REFRESH_DEBOUNCE_MS` | Debounce window for refresh events                                                   |
+| `KODER_REFRESH_COMMAND`     | Custom refresh command                                                               |
+| `KODER_CODEX_BUNDLE_ID`     | Bundle ID for the Codex desktop app                                                  |
+| `CODEX_HOME`                  | Codex data directory                                                                 |
 
 Examples:
 
 ```sh
 # Self-hosted relay
-REMODEX_RELAY="ws://localhost:9000/relay" koder up
+KODER_RELAY="ws://localhost:9000/relay" koder up
 
 # Existing Codex instance
-REMODEX_CODEX_ENDPOINT="ws://localhost:8080" koder up
+KODER_CODEX_ENDPOINT="ws://localhost:8080" koder up
 
 # Desktop refresh workaround
-REMODEX_REFRESH_ENABLED=true koder up
+KODER_REFRESH_ENABLED=true koder up
 ```
 
 ## Security Notes
@@ -164,7 +160,7 @@ For the full self-hosting flow, see [Docs/self-hosting.md](Docs/self-hosting.md)
 The short version:
 
 1. run your own relay
-2. point the bridge at it with `REMODEX_RELAY`
+2. point the bridge at it with `KODER_RELAY`
 3. keep hosted assumptions out of the OSS path
 
 ## Contributing
