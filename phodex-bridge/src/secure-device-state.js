@@ -1,5 +1,5 @@
 // FILE: secure-device-state.js
-// Purpose: Persists canonical bridge identity, trusted-phone state, and last seen iPhone app version for local QR pairing.
+// Purpose: Persists canonical bridge identity, trusted-client state, and last seen client version for secure reconnects.
 // Layer: CLI helper
 // Exports: loadOrCreateBridgeDeviceState, readBridgeDeviceState, resetBridgeDeviceState, rememberTrustedPhone, rememberLastSeenPhoneAppVersion, getTrustedPhonePublicKey, resolveBridgeRelaySession
 // Depends on: fs, os, path, crypto, child_process
@@ -61,7 +61,7 @@ function readBridgeDeviceState() {
   return keychainRecord.state || null;
 }
 
-// Removes the saved bridge identity/trust state so the next `remodex up` requires a fresh QR pairing.
+// Removes the saved bridge identity/trust state so the next `remodex up` requires a fresh client bootstrap.
 function resetBridgeDeviceState() {
   const removedCanonicalFile = deleteCanonicalFileState();
   const removedKeychainMirror = deleteKeychainStateString();
@@ -72,7 +72,7 @@ function resetBridgeDeviceState() {
   };
 }
 
-// Generates a fresh relay session for every bridge launch so QR pairing stays explicit per-run.
+// Generates a fresh relay session for every bridge launch so secure bootstrap stays explicit per-run.
 function resolveBridgeRelaySession(state, { persist = true } = {}) {
   return {
     deviceState: state,
@@ -81,7 +81,7 @@ function resolveBridgeRelaySession(state, { persist = true } = {}) {
   };
 }
 
-// Persists the trusted iPhone identity so reconnects can be authenticated during the current pairing flow.
+// Persists the trusted client identity so reconnects can be authenticated during the current pairing flow.
 function rememberTrustedPhone(state, phoneDeviceId, phoneIdentityPublicKey, { persist = true } = {}) {
   const normalizedDeviceId = normalizeNonEmptyString(phoneDeviceId);
   const normalizedPublicKey = normalizeNonEmptyString(phoneIdentityPublicKey);
@@ -89,7 +89,7 @@ function rememberTrustedPhone(state, phoneDeviceId, phoneIdentityPublicKey, { pe
     return state;
   }
 
-  // Remodex supports one trusted iPhone per Mac, so a new trust record replaces old ones.
+  // The bridge supports one trusted remote client per Mac, so a new trust record replaces old ones.
   const nextState = normalizeBridgeDeviceState({
     ...state,
     trustedPhones: {

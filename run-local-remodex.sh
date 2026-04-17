@@ -34,7 +34,7 @@ usage() {
 Usage: ./run-local-remodex.sh [options]
 
 Options:
-  --hostname HOSTNAME   Hostname or IP the iPhone should use to reach the relay
+  --hostname HOSTNAME   Hostname or IP the browser client should use to reach this machine
   --bind-host HOST      Interface/address the local relay should listen on
   --port PORT           Relay port to listen on
   --help                Show this help text
@@ -161,7 +161,7 @@ ensure_prerequisites() {
   ensure_node_version
 }
 
-# Validates the advertised host before boot so the QR cannot point at another machine by mistake.
+# Validates the advertised host before boot so the self-hosted browser flow points at this machine.
 ensure_hostname_belongs_to_this_mac() {
   node -e '
 const dns = require("node:dns");
@@ -187,7 +187,7 @@ dns.lookup(hostname, { all: true }, (error, records) => {
   process.exit(isLocal ? 0 : 1);
 });
 ' "${RELAY_HOSTNAME}" || die "The advertised hostname '${RELAY_HOSTNAME}' does not resolve back to this Mac.
-Pass --hostname with a LAN hostname or IP address that points to this machine so the iPhone can connect."
+Pass --hostname with a LAN hostname or IP address that points to this machine so the browser client can connect."
 }
 
 package_dependencies_installed() {

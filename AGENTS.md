@@ -7,7 +7,6 @@ This is the single repo-local agent guidance file for this project. Do not recre
 - Koder is **web-first** now.
 - `web/` is the active client direction.
 - `phodex-bridge/` and `relay/` are the current operational core.
-- `CodexMobile/` is legacy/reference unless the user explicitly asks for iOS work.
 - Default assumption: the active product is fully self-hosted and free.
 
 ## Core Guardrails
@@ -26,7 +25,6 @@ This is the single repo-local agent guidance file for this project. Do not recre
 - Present `koder` as the preferred CLI name.
 - Mention `remodex` only where legacy package or compatibility details still matter.
 - Use the current repo path `arwebSE/koder` in new docs when a clone URL is needed.
-- Keep `CodexMobile/` described as legacy/reference unless the user asks otherwise.
 
 ## Security and Privacy Guardrails
 
@@ -37,21 +35,12 @@ This is the single repo-local agent guidance file for this project. Do not recre
 
 ## Connection and Runtime Guardrails
 
-- Preserve QR/bootstrap and saved-pairing flows in the bridge.
-- Prefer direct self-host browser access over QR in the web client.
+- Prefer direct self-host browser access as the default client flow.
+- Preserve secure reconnect behavior and local bridge bootstrap state.
 - Avoid regressions in reconnect behavior or session recovery.
 - Keep repo isolation by thread/project metadata and local `cwd`.
 - Preserve local workspace and git execution on the user's machine.
 - Keep desktop refresh optional and avoid making it the default assumption.
-
-## Legacy iOS Guardrails
-
-If you touch `CodexMobile/`:
-
-- preserve existing runtime compatibility behavior unless explicitly changing it
-- prefer targeted edits over speculative refactors
-- do not run Xcode tests unless the user explicitly asks
-- treat the iOS codebase as compatibility work, not the primary product surface
 
 ## Web Guardrails
 

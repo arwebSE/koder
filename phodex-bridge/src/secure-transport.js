@@ -75,7 +75,7 @@ function createBridgeSecureTransport({
       if (parsed.method || parsed.id != null) {
         sendControlMessage(createSecureError({
           code: "update_required",
-          message: "This bridge requires the latest Remodex iPhone app for secure pairing.",
+          message: "This bridge requires the latest Koder client for secure pairing.",
         }));
         return true;
       }
@@ -140,7 +140,7 @@ function createBridgeSecureTransport({
     if (protocolVersion !== SECURE_PROTOCOL_VERSION || incomingSessionId !== sessionId) {
       sendControlMessage(createSecureError({
         code: "update_required",
-        message: "The bridge and iPhone are not using the same secure transport version.",
+        message: "The bridge and client are not using the same secure transport version.",
       }));
       return;
     }
@@ -148,7 +148,7 @@ function createBridgeSecureTransport({
     if (!phoneDeviceId || !phoneIdentityPublicKey || !phoneEphemeralPublicKey || !clientNonceBase64) {
       sendControlMessage(createSecureError({
         code: "invalid_client_hello",
-        message: "The iPhone handshake is missing required secure fields.",
+        message: "The client handshake is missing required secure fields.",
       }));
       return;
     }
@@ -156,7 +156,7 @@ function createBridgeSecureTransport({
     if (handshakeMode !== HANDSHAKE_MODE_QR_BOOTSTRAP && handshakeMode !== HANDSHAKE_MODE_TRUSTED_RECONNECT) {
       sendControlMessage(createSecureError({
         code: "invalid_handshake_mode",
-        message: "The iPhone requested an unknown secure pairing mode.",
+        message: "The client requested an unknown secure pairing mode.",
       }));
       return;
     }
@@ -164,7 +164,7 @@ function createBridgeSecureTransport({
     if (handshakeMode === HANDSHAKE_MODE_QR_BOOTSTRAP && Date.now() > currentPairingExpiresAt) {
       sendControlMessage(createSecureError({
         code: "pairing_expired",
-        message: "The pairing QR code has expired. Generate a new QR code from the bridge.",
+        message: "The bootstrap session has expired. Restart the bridge or reconnect from the web client.",
       }));
       return;
     }
@@ -174,14 +174,14 @@ function createBridgeSecureTransport({
       if (!trustedPhonePublicKey) {
         sendControlMessage(createSecureError({
           code: "phone_not_trusted",
-          message: "This iPhone is not trusted by the current bridge session. Scan a fresh QR code to pair again.",
+          message: "This client is not trusted by the current bridge session. Start a fresh self-hosted connection.",
         }));
         return;
       }
       if (trustedPhonePublicKey !== phoneIdentityPublicKey) {
         sendControlMessage(createSecureError({
           code: "phone_identity_changed",
-          message: "The trusted iPhone identity does not match this reconnect attempt.",
+          message: "The trusted client identity does not match this reconnect attempt.",
         }));
         return;
       }
@@ -191,7 +191,7 @@ function createBridgeSecureTransport({
     if (!clientNonce || clientNonce.length === 0) {
       sendControlMessage(createSecureError({
         code: "invalid_client_nonce",
-        message: "The iPhone secure nonce could not be decoded.",
+        message: "The client secure nonce could not be decoded.",
       }));
       return;
     }

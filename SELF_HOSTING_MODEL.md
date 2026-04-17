@@ -9,7 +9,6 @@ If you cloned Koder from GitHub, the intended path is local-first usage or self-
 The public repository includes:
 
 - the bridge that runs on your Mac
-- the iOS app source code
 - the public relay code
 - local pairing and self-hosting documentation
 
@@ -33,16 +32,16 @@ The public repo now also includes the trusted-Mac reconnect flow, but the built-
 
 If you use the public repo, you should expect one of these flows:
 
-1. Local LAN pairing on your own machine with `./run-local-koder.sh`
+1. Local LAN browser access on your own machine with `./run-local-koder.sh`
 2. A self-hosted relay on your own VPS, passed in through `REMODEX_RELAY`
 
 That means:
 
 - Codex still runs on your Mac
 - git commands still run on your Mac
-- the iPhone is still a paired remote client
+- the browser is the paired remote client
 - the relay is only the transport layer
-- the first QR scan bootstraps trust
+- direct self-host bootstrap establishes trust
 - later reconnects can reuse that trusted Mac over the same relay
 
 For most GitHub users, the easiest first step is:
@@ -55,7 +54,7 @@ cd koder
 
 For the full public setup guide, read [Docs/self-hosting.md](Docs/self-hosting.md).
 
-If you want the smoothest self-hosted iPhone path, prefer a relay reachable through Tailscale or another stable private network instead of plain LAN-only routing.
+If you want the smoothest self-hosted phone path, prefer a relay reachable through Tailscale or another stable private network instead of plain LAN-only routing.
 
 ## Why the Repo Stays Generic
 
@@ -63,7 +62,7 @@ The public repo stays generic on purpose.
 
 That keeps the self-host path honest:
 
-- people can inspect the transport and pairing code
+- people can inspect the transport and reconnect code
 - people can run Koder locally
 - people can self-host their own relay
 - people are not silently tied to someone else's hosted infrastructure
@@ -98,6 +97,6 @@ If you cloned Koder from GitHub:
 - do not expect a private hosted relay to be built in
 - use `./run-local-koder.sh` for local testing
 - use `REMODEX_RELAY` for your own VPS or hosted relay
-- use QR once to trust the Mac, then let reconnect reuse that trust
+- use the browser client to trust the Mac, then let reconnect reuse that trust
 - remember that the built-in daemon/background service path is currently macOS-only
 - treat the public repo as the self-hostable version of the project

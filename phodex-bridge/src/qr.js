@@ -1,11 +1,10 @@
 // FILE: qr.js
-// Purpose: Prints the bridge pairing payload as both QR and a short terminal-friendly pairing code.
+// Purpose: Generates short-lived bootstrap codes and prints a concise bridge-ready summary.
 // Layer: CLI helper
 // Exports: SHORT_PAIRING_CODE_ALPHABET, SHORT_PAIRING_CODE_LENGTH, createShortPairingCode, printQR
-// Depends on: crypto, qrcode-terminal
+// Depends on: crypto
 
 const { randomBytes } = require("crypto");
-const qrcode = require("qrcode-terminal");
 
 const SHORT_PAIRING_CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 const SHORT_PAIRING_CODE_LENGTH = 10;
@@ -42,17 +41,18 @@ function normalizePairingSession(pairingSessionOrPayload) {
 
 function printQR(pairingSessionOrPayload) {
   const { pairingPayload, pairingCode } = normalizePairingSession(pairingSessionOrPayload);
-  const payload = JSON.stringify(pairingPayload);
+  const relayUrl = typeof pairingPayload?.relay === "string" ? pairingPayload.relay : "unknown";
+  const expiresAt = Number.isFinite(pairingPayload?.expiresAt)
+    ? new Date(pairingPayload.expiresAt).toISOString()
+    : "unknown";
 
-  console.log("\nScan this QR with the iPhone:\n");
-  qrcode.generate(payload, { small: true });
+  console.log("\n[koder] Bridge bootstrap is ready.");
+  console.log(`[koder] Relay: ${relayUrl}`);
+  console.log(`[koder] Expires: ${expiresAt}`);
   if (pairingCode) {
-    console.log("Or paste this pairing code in the iPhone app:\n");
-    console.log(pairingCode);
+    console.log("[koder] A short recovery code is available in local state if a future client flow needs it.");
   }
-  console.log(`\nSession ID: ${pairingPayload.sessionId}`);
-  console.log(`Device ID: ${pairingPayload.macDeviceId}`);
-  console.log(`Expires: ${new Date(pairingPayload.expiresAt).toISOString()}\n`);
+  console.log("[koder] Open the self-hosted web client on the same host or IP to connect.\n");
 }
 
 module.exports = {

@@ -4,7 +4,7 @@ This guide is for developers who clone the public GitHub repository and want to 
 
 It covers two supported setups:
 
-1. Local LAN pairing on your own machine
+1. Local LAN access on your own machine
 2. A self-hosted VPS relay that your bridge connects to over the internet
 
 This document intentionally avoids any private hosted-service details. If you are using the public repo, assume you are bringing your own relay endpoint.
@@ -12,9 +12,9 @@ This document intentionally avoids any private hosted-service details. If you ar
 The public source tree is local-first and self-host friendly:
 
 - there is no public production relay baked into the GitHub source
-- local pairing should work out of the box with `./run-local-koder.sh`
+- local browser access should work out of the box with `./run-local-koder.sh`
 - internet-facing setups should pass their own relay URL explicitly with `REMODEX_RELAY`
-- the first QR scan bootstraps trust, then later reconnects can reuse the same trusted Mac through that relay
+- the browser connects directly to the live bridge on your host, then later reconnects can reuse that trust through the relay
 - the built-in background daemon for trusted reconnect is currently macOS-only
 
 ## What Koder Self-Hosting Means
@@ -26,19 +26,19 @@ That means:
 - the bridge runs on your own Mac
 - Codex runs on your own Mac
 - git commands run on your own Mac
-- your iPhone is a remote control
+- your phone browser is the remote client
 - the relay is only a transport layer for pairing, trusted-session resolve, and encrypted message forwarding
 
 The relay does not run Codex and does not get your plaintext application payloads after the secure handshake completes.
 
 ## Option 1: Local LAN Setup
 
-This is the easiest way to try the public repo, but on iPhone it should be treated as a best-effort local test path. The recommended self-host setup for regular use is Tailscale or another stable private network path to your relay.
+This is the easiest way to try the public repo. For regular use, a Tailscale or other stable private-network path is usually better than plain LAN routing.
 
 ### What you need
 
 - a Mac with Codex CLI installed
-- an iPhone with a legacy Koder/Remodex reference build installed
+- a phone browser that can reach your Mac over HTTPS
 - both devices on the same local network
 
 ### Start everything locally
@@ -56,18 +56,17 @@ What this does:
 - starts a local relay on your machine
 - starts the Koder bridge
 - starts the local web client on port `5173` over HTTPS
-- prints the browser URL, secure relay URL, pairing code, and QR bootstrap payload
+- prints the browser URL and secure relay URL
 
 Then:
 
 1. Open the printed browser URL on your phone
-2. If the browser warns that the local certificate is untrusted, trust it first. Otherwise the page still will not count as a secure camera origin.
-3. In the PWA, scan the QR from your Mac terminal. If live camera access is still unavailable on that browser session, use the `Use photo` fallback or paste the printed secure relay URL and pairing code.
-4. Tap `Connect to Mac` if you used the manual pairing fields
-5. Start a thread and send a message
-6. On later launches, use the trusted reconnect buttons before pairing again
+2. If the browser warns that the local certificate is untrusted, trust it first.
+3. Use the direct connect flow in the PWA.
+4. Start a thread and send a message.
+5. On later launches, trusted reconnect should restore the same Mac automatically.
 
-### If your iPhone cannot reach the default hostname
+### If your phone cannot reach the default hostname
 
 Pass a hostname or IP address that the phone can actually reach:
 
@@ -95,7 +94,7 @@ You should get:
 
 Use this when you want the bridge on your Mac to connect through a relay you run on a VPS.
 
-This is also the best base for a Tailscale setup: the relay can live on a Mac, a mini server, or a VPS you control, as long as the iPhone can reach it reliably.
+This is also the best base for a Tailscale setup: the relay can live on a Mac, a mini server, or a VPS you control, as long as the browser client can reach it reliably.
 
 ### What runs where
 
@@ -108,9 +107,9 @@ On your Mac:
 - the Koder bridge
 - Codex CLI / `codex app-server`
 
-On your iPhone:
+On your phone:
 
-- the Koder client
+- the Koder PWA in the browser
 
 ### Start the relay on the VPS
 
@@ -166,16 +165,12 @@ npm install
 REMODEX_RELAY="wss://relay.example.com/relay" npm start
 ```
 
-The bridge will print a QR code the first time you trust that Mac, or later if you intentionally reset trust.
+After the first successful browser connection:
 
-That QR carries the relay URL and session information, so the iPhone does not need a hardcoded relay endpoint in the public source build.
-
-After the first successful scan:
-
-- the iPhone stores the Mac as a trusted device
+- the client stores the Mac as a trusted device
 - the bridge keeps its local device identity
 - the relay can resolve the current live session for that trusted Mac
-- the app can reconnect without requiring a new QR every time
+- the app can reconnect without requiring a manual bootstrap every time
 
 Today, that background-service path is built in for macOS. If you self-host against a non-macOS bridge, pairing and relay routing still work, but you must manage persistence/background service behavior yourself.
 
@@ -220,7 +215,7 @@ The public repo should stay generic. Your actual deployment values belong in you
 
 ## Troubleshooting
 
-### The bridge starts but the iPhone cannot connect
+### The bridge starts but the browser client cannot connect
 
 Check:
 
@@ -229,7 +224,7 @@ Check:
 - the bridge is using the correct `REMODEX_RELAY`
 - the public endpoint uses `wss://` if you are going over the internet
 
-### Local LAN pairing fails
+### Local LAN access fails
 
 Try a concrete LAN IP:
 
@@ -237,9 +232,9 @@ Try a concrete LAN IP:
 ./run-local-koder.sh --hostname 192.168.1.10
 ```
 
-If local LAN pairing still fails on iPhone even though the relay health check works, prefer a Tailscale-reachable relay instead of continuing to rely on plain `ws://` over the same Wi-Fi.
+If local LAN access still fails even though the relay health check works, prefer a Tailscale-reachable relay instead of continuing to rely on plain same-Wi-Fi routing.
 
-### The relay health check works, but pairing still fails
+### The relay health check works, but bootstrap still fails
 
 That usually means one of these:
 
@@ -252,9 +247,9 @@ That usually means one of these:
 If you cloned the public repo, the supported self-hosting story is:
 
 - run the relay yourself
-- prefer a relay path reachable from iPhone over Tailscale or another stable private network
+- prefer a relay path reachable from the browser client over Tailscale or another stable private network
 - point the bridge at your relay with `REMODEX_RELAY`
-- scan the QR from the iPhone app once to trust the Mac
+- open the browser client on the same host or IP once to trust the Mac
 - let reconnect reuse that trusted Mac over the same relay
 - remember that the built-in daemon path is currently macOS-only
 - keep private hostnames and credentials out of the public repo

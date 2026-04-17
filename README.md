@@ -14,7 +14,6 @@ Be precise about the current state:
 
 - `web/` is the new primary direction and now works as the self-hosted React + Vite + TypeScript PWA client.
 - `phodex-bridge/` and `relay/` are the working backend pieces that drive session routing and the local Codex bridge.
-- `CodexMobile/` is still in the repo as a **legacy reference client**, not the future product direction.
 
 That means Koder is now **web-first in both roadmap and active self-hosted usage**.
 
@@ -38,7 +37,6 @@ See [Docs/KODER_PRODUCT_SPEC.md](Docs/KODER_PRODUCT_SPEC.md) for the current wor
 ├── phodex-bridge/   Node bridge package and CLI (`koder`, legacy `remodex`)
 ├── relay/           Self-hostable relay and optional push service
 ├── web/             React + Vite + TypeScript PWA client
-├── CodexMobile/     Legacy iOS reference client
 ├── Docs/            Product notes and self-hosting docs
 └── Legal/           Privacy policy and terms from the older app era
 ```
@@ -58,9 +56,9 @@ That starts:
 - a local relay
 - the local bridge
 - the local web client on port `5173`
-- pairing output for the browser PWA flow
+- direct self-host browser access on the same host or IP
 
-Open the printed browser URL on your phone over HTTPS. The launcher serves the PWA on a secure origin and exposes a matching `wss://.../relay` URL through that same origin. The browser now attaches directly to the live self-hosted bridge on that host; QR is legacy bridge output, not the web onboarding path.
+Open the printed browser URL on your phone over HTTPS. The launcher serves the PWA on a secure origin and exposes a matching `wss://.../relay` URL through that same origin. The browser attaches directly to the live self-hosted bridge on that host.
 
 ### npm Bridge Install
 
@@ -104,7 +102,7 @@ The preferred CLI name is `koder`.
 - `koder run`
   Runs the bridge in the foreground.
 - `koder start`
-  macOS only. Starts the background bridge service without waiting for a QR in the current terminal.
+  macOS only. Starts the background bridge service without waiting for interactive terminal output.
 - `koder restart`
   macOS only. Restarts the background bridge service.
 - `koder stop`
@@ -114,7 +112,7 @@ The preferred CLI name is `koder`.
 - `koder run-service`
   macOS only. Internal `launchd` service entrypoint.
 - `koder reset-pairing`
-  Clears saved pairing state so the next connection requires a fresh QR/bootstrap.
+  Clears saved trust state so the next connection requires a fresh bootstrap.
 - `koder resume`
   Reopens the last active thread in `Codex.app`.
 - `koder watch [threadId]`
@@ -168,10 +166,6 @@ The short version:
 1. run your own relay
 2. point the bridge at it with `REMODEX_RELAY`
 3. keep hosted assumptions out of the OSS path
-
-## Legacy iOS Client
-
-`CodexMobile/` remains in the repo for protocol reference and migration support. It is no longer the product direction. If you touch it, treat it as compatibility/legacy work unless the user explicitly wants iOS changes.
 
 ## Contributing
 

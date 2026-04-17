@@ -26,20 +26,19 @@ The product direction is now simple:
 
 - Primary client: React + Vite + TypeScript PWA in `web/`
 - Runtime core: `phodex-bridge/` and `relay/`
-- Legacy reference only: `CodexMobile/`
 
 ## Access Model
 
 - Open the PWA from the same host or IP that is running `./run-local-koder.sh`
 - The browser attaches directly to the live self-hosted bridge on that host
-- Trusted reconnect can still exist as a convenience, but QR-first onboarding is no longer the target browser flow
+- Trusted reconnect can still exist as a convenience, but browser-first direct bootstrap is the default flow
 
 ## Near-Term Priorities
 
 1. Keep the self-hosted PWA stable on phone-sized screens
 2. Reduce transcript/session payload size and keep scrolling responsive
 3. Tighten direct-host bootstrap and client approval/recovery flows
-4. Continue removing legacy iOS-first assumptions from the browser UX and docs
+4. Continue removing stale pairing and legacy naming assumptions from the bridge UX and docs
 
 ## Non-Goals
 

@@ -40,8 +40,7 @@ Opening a PR does not create an obligation on my side. I may close it. I may ign
 - **[Codex CLI](https://github.com/openai/codex)** installed and working
 - **[Codex desktop app](https://openai.com/index/codex/)** (optional — for viewing threads on Mac)
 - **macOS** (required for desktop refresh; core bridge works on any OS)
-- **Xcode 16+** (only for building the iOS app)
-- **iPhone** with the legacy reference app if you are still testing the old mobile path
+- **Phone browser** that can reach your dev machine over HTTPS
 
 ### Bridge setup
 
@@ -58,7 +57,7 @@ This launcher:
 1. Spawns a Codex `app-server` process
 2. Starts a local relay on `/relay/{sessionId}`
 3. Points the bridge at that relay
-4. Prints a QR code in your terminal for the initial trust bootstrap
+4. Prints the self-host browser URL and relay URL for direct connection
 
 If you only want the bridge process:
 
@@ -72,31 +71,16 @@ That runs `koder up`, which:
 1. Spawns a Codex `app-server` process
 2. Connects to the configured relay
 3. On macOS, starts the built-in background bridge service
-4. Prints a QR code in your terminal when first-time pairing or recovery is needed
-
-Scan the QR code with the current client flow or the legacy iOS reference app to trust that Mac.
-
-### iOS app setup
-
-```sh
-cd CodexMobile
-open CodexMobile.xcodeproj
-```
-
-1. Select your team in **Signing & Capabilities** (you'll need an Apple Developer account)
-2. Pick a target device (physical iPhone or simulator)
-3. Build and run (Cmd+R)
-
-The app uses SwiftUI and the current project target is iOS 18.6. No CocoaPods or SPM dependencies — it's a standalone Xcode project.
+4. Publishes bridge bootstrap state for the browser client and reconnect flow
 
 ### Testing a full local session
 
 1. Start the local launcher: `./run-local-koder.sh`
-2. Open the iOS app and scan the QR code
+2. Open the printed browser URL on your phone
 3. Create a new thread from the app
 4. Send a message — you should see Codex respond in real-time
 5. Try git operations from the phone (commit, push, branch switching)
-6. Reopen the app and verify that the trusted reconnect path is used instead of forcing a fresh QR immediately
+6. Reopen the app and verify that the trusted reconnect path is used instead of forcing a fresh bootstrap immediately
 
 ### Environment variables
 
@@ -127,39 +111,22 @@ remodex/
 │       ├── workspace-handler.js    # Workspace/cwd management
 │       ├── session-state.js        # Thread persistence (~/.remodex/)
 │       ├── rollout-watch.js        # Thread event log tailing
-│       └── qr.js                   # QR code generation
+│       └── qr.js                   # Bootstrap summary + short recovery code generation
 │
-├── CodexMobile/            # Xcode project root
-│   ├── CodexMobile/        # App source target
-│   │   ├── Services/       # Core services
-│   │   │   ├── CodexService.swift              # Main service coordinator
-│   │   │   ├── CodexService+Connection.swift   # WebSocket connection
-│   │   │   ├── CodexService+Incoming.swift     # Message handling
-│   │   │   ├── CodexService+Messages.swift     # Message composition
-│   │   │   ├── CodexService+History.swift      # Thread history
-│   │   │   ├── CodexService+ThreadsTurns.swift # Thread/turn management
-│   │   │   ├── GitActionsService.swift         # Git operations
-│   │   │   └── AppEnvironment.swift            # Runtime config
-│   │   ├── Views/          # SwiftUI views
-│   │   │   ├── Turn/       # Message timeline + composer
-│   │   │   ├── Sidebar/    # Project/thread navigation
-│   │   │   └── Home/       # Home + onboarding
-│   │   └── Models/         # Data models
-│   ├── CodexMobileTests/   # Unit tests
-│   ├── CodexMobileUITests/ # UI tests
-│   └── BuildSupport/       # Build support files
+├── relay/                  # Self-hosted relay
+├── web/                    # Browser PWA client
 ```
 
 ### Code style
 
 - **Bridge**: CommonJS, no transpilation, no TypeScript. Keep it simple.
-- **iOS**: SwiftUI, async/await, MainActor isolation. Follow existing patterns.
+- **Web**: React, TypeScript, Vite. Keep mobile behavior deliberate and self-hosted.
 - No linter or formatter is enforced — just match what's already there.
 
 ### Trust model
 
-- The first QR pairing is possession-based: it contains the relay URL and a live session ID.
-- After that first handshake, the iPhone stores a trusted Mac record and can ask the relay for the Mac's current live session again.
+- The first direct browser bootstrap establishes trust against a live relay session.
+- After that first handshake, the client stores a trusted Mac record and can ask the relay for the Mac's current live session again.
 - Set `REMODEX_RELAY` to a relay you control when you are not using the local launcher. Use `wss://` when you want TLS in transit.
 - Koder uses an authenticated end-to-end encrypted transport after pairing completes. The relay code is public for inspection, but deployed relay details should stay in private config.
 - The built-in daemon / background service path is currently macOS-only. Linux and Windows can still run the bridge, but contributors should treat the daemon logic as platform-specific.
