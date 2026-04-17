@@ -106,6 +106,8 @@ export interface ConnectionSummary {
 export interface ClientSnapshot {
   connection: ConnectionSummary;
   threads: ThreadSummary[];
+  threadListHasMore: boolean;
+  threadListNextCursor: string | null;
   activeThreadId: string | null;
   messagesByThread: Record<string, ConversationMessage[]>;
   pendingApprovals: ApprovalRequest[];

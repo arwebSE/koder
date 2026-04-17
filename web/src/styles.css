@@ -474,6 +474,65 @@ h1 {
     background 150ms ease;
 }
 
+.thread-group {
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 22px;
+  background: rgba(255, 255, 255, 0.025);
+}
+
+.thread-group__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.thread-group__copy {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.thread-group__copy strong {
+  display: block;
+  font-size: 0.88rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.thread-group__copy span {
+  color: var(--muted);
+  font-size: 0.74rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.thread-group__count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.8rem;
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--muted);
+  font-size: 0.72rem;
+}
+
+.thread-group__list {
+  display: grid;
+  gap: 8px;
+}
+
+.thread-list__footer {
+  width: 100%;
+}
+
 .thread:hover,
 .thread:focus-visible {
   transform: translateY(-1px);
@@ -684,6 +743,16 @@ h1 {
 .message-pane__empty span {
   color: var(--muted);
   max-width: 32rem;
+}
+
+.message-pane__older {
+  justify-self: center;
+  padding: 8px 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--muted);
+  cursor: pointer;
 }
 
 .message {
@@ -1305,6 +1374,21 @@ h1 {
   .trusted-grid {
     padding-right: 0;
   }
+
+  .thread-group {
+    padding: 9px;
+    border-radius: 18px;
+  }
+
+  .thread-group__copy strong {
+    font-size: 0.84rem;
+  }
+
+  .thread-group__copy span,
+  .thread-group__count,
+  .message-pane__older {
+    font-size: 0.72rem;
+  }
 }
 
 @media (max-width: 640px) {
@@ -1607,6 +1691,26 @@ h1 {
     border-radius: 16px;
   }
 
+  .thread-group {
+    gap: 7px;
+    padding: 8px;
+    border-radius: 16px;
+  }
+
+  .thread-group__copy strong {
+    font-size: 0.8rem;
+  }
+
+  .thread-group__copy span {
+    font-size: 0.68rem;
+  }
+
+  .thread-group__count {
+    min-width: 1.5rem;
+    padding: 3px 6px;
+    font-size: 0.66rem;
+  }
+
   .thread__meta {
     gap: 8px;
   }
@@ -1654,6 +1758,11 @@ h1 {
 
   .message-pane {
     gap: 10px;
+  }
+
+  .message-pane__older {
+    padding: 7px 10px;
+    font-size: 0.7rem;
   }
 
   .message-pane__empty {

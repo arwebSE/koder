@@ -21,6 +21,12 @@ import type {
 
 const client = new KoderClient();
 const COMPACT_LAYOUT_QUERY = "(max-width: 920px)";
+const COMPACT_MESSAGE_WINDOW = 10;
+const COMPACT_MESSAGE_PAGE = 10;
+const DESKTOP_MESSAGE_WINDOW = 18;
+const DESKTOP_MESSAGE_PAGE = 18;
+const COMPACT_THREAD_WINDOW = 18;
+const DESKTOP_THREAD_WINDOW = 24;
 
 type MobilePane = "sessions" | "chat" | "status";
 type OnboardingMode = "scanner" | "manual" | "json";
@@ -417,11 +423,15 @@ function App() {
               <SessionRail
                 connection={snapshot.connection}
                 threads={snapshot.threads}
+                threadListHasMore={snapshot.threadListHasMore}
                 trustedMacCount={snapshot.trustedMacs.length}
                 activeThreadId={snapshot.activeThreadId}
                 activeAction={activeAction}
                 isCompactLayout={isCompactLayout}
                 onCreateThread={handleCreateThread}
+                onLoadMoreThreads={() => {
+                  void runAction("threads:more", () => client.loadMoreThreads());
+                }}
                 onOpenThread={handleOpenThread}
                 onDisconnect={() => {
                   void runAction("disconnect", () => client.disconnect({ preservePairing: true }));
@@ -561,14 +571,50 @@ function App() {
 function SessionRail(props: {
   connection: ClientSnapshot["connection"];
   threads: ThreadSummary[];
+  threadListHasMore: boolean;
   trustedMacCount: number;
   activeThreadId: string | null;
   activeAction: string | null;
   isCompactLayout: boolean;
   onCreateThread: () => void;
+  onLoadMoreThreads: () => void;
   onOpenThread: (threadId: string) => void;
   onDisconnect: () => void;
 }) {
+  const visibleThreadWindow = props.isCompactLayout ? COMPACT_THREAD_WINDOW : DESKTOP_THREAD_WINDOW;
+  const [visibleThreadCount, setVisibleThreadCount] = useState(visibleThreadWindow);
+
+  useEffect(() => {
+    const minimumVisible = props.threads.length === 0
+      ? visibleThreadWindow
+      : Math.min(visibleThreadWindow, props.threads.length);
+    setVisibleThreadCount((current) => {
+      if (current < minimumVisible) {
+        return minimumVisible;
+      }
+      if (current > props.threads.length && props.threads.length > 0) {
+        return props.threads.length;
+      }
+      return current;
+    });
+  }, [props.threads.length, visibleThreadWindow]);
+
+  const visibleThreads = props.threads.slice(0, visibleThreadCount);
+  const threadGroups = useMemo(() => buildThreadProjectGroups(visibleThreads), [visibleThreads]);
+  const hiddenLoadedThreads = Math.max(0, props.threads.length - visibleThreadCount);
+
+  function handleLoadOlderThreads() {
+    if (hiddenLoadedThreads > 0) {
+      setVisibleThreadCount((current) => Math.min(props.threads.length, current + visibleThreadWindow));
+      return;
+    }
+    props.onLoadMoreThreads();
+  }
+
+  const loadOlderLabel = hiddenLoadedThreads > 0
+    ? `Show ${Math.min(hiddenLoadedThreads, visibleThreadWindow)} more recent sessions`
+    : (props.threadListHasMore ? "Load older sessions" : "");
+
   return (
     <>
       {!props.isCompactLayout ? (
@@ -620,14 +666,38 @@ function SessionRail(props: {
           {props.threads.length === 0 ? (
             <p className="sidebar__empty">No sessions yet. Start one and it will appear here.</p>
           ) : null}
-          {props.threads.map((thread) => (
-            <ThreadListItem
-              key={thread.id}
-              thread={thread}
-              active={props.activeThreadId === thread.id}
-              onOpen={() => props.onOpenThread(thread.id)}
-            />
+          {threadGroups.map((group) => (
+            <section key={group.key} className="thread-group">
+              <header className="thread-group__header">
+                <div className="thread-group__copy">
+                  <strong>{group.label}</strong>
+                  <span>{group.pathLabel}</span>
+                </div>
+                <span className="thread-group__count">{group.threads.length}</span>
+              </header>
+
+              <div className="thread-group__list">
+                {group.threads.map((thread) => (
+                  <ThreadListItem
+                    key={thread.id}
+                    thread={thread}
+                    active={props.activeThreadId === thread.id}
+                    onOpen={() => props.onOpenThread(thread.id)}
+                  />
+                ))}
+              </div>
+            </section>
           ))}
+          {loadOlderLabel ? (
+            <button
+              type="button"
+              className="thread-list__footer chip chip--ghost"
+              disabled={props.activeAction === "threads:more"}
+              onClick={handleLoadOlderThreads}
+            >
+              {loadOlderLabel}
+            </button>
+          ) : null}
         </div>
       </section>
     </>
@@ -672,10 +742,56 @@ function ChatStage(props: {
 }) {
   const hasThread = Boolean(props.activeThread);
   const messagePaneRef = useRef<HTMLDivElement | null>(null);
+  const scrollRestoreRef = useRef<{ scrollHeight: number; scrollTop: number } | null>(null);
+  const shouldStickToBottomRef = useRef(true);
+  const initialVisibleMessageCount = props.isCompactLayout ? COMPACT_MESSAGE_WINDOW : DESKTOP_MESSAGE_WINDOW;
+  const messagePageSize = props.isCompactLayout ? COMPACT_MESSAGE_PAGE : DESKTOP_MESSAGE_PAGE;
+  const activeThreadId = props.activeThread?.id ?? null;
+  const [visibleMessageCount, setVisibleMessageCount] = useState(initialVisibleMessageCount);
+  const hiddenMessageCount = Math.max(0, props.activeMessages.length - visibleMessageCount);
+  const visibleMessages = hiddenMessageCount > 0
+    ? props.activeMessages.slice(-visibleMessageCount)
+    : props.activeMessages;
+  const latestVisibleMessageId = visibleMessages.at(-1)?.id ?? "";
+
+  useEffect(() => {
+    shouldStickToBottomRef.current = true;
+    setVisibleMessageCount(activeThreadId ? Math.min(initialVisibleMessageCount, props.activeMessages.length) : initialVisibleMessageCount);
+  }, [activeThreadId, initialVisibleMessageCount]);
+
+  useEffect(() => {
+    if (!activeThreadId) {
+      return;
+    }
+    const minimumVisible = Math.min(initialVisibleMessageCount, props.activeMessages.length);
+    setVisibleMessageCount((current) => current < minimumVisible ? minimumVisible : current);
+  }, [activeThreadId, initialVisibleMessageCount, props.activeMessages.length]);
+
+  function revealOlderMessages() {
+    const pane = messagePaneRef.current;
+    if (!pane || hiddenMessageCount <= 0) {
+      return;
+    }
+    scrollRestoreRef.current = {
+      scrollHeight: pane.scrollHeight,
+      scrollTop: pane.scrollTop,
+    };
+    shouldStickToBottomRef.current = false;
+    setVisibleMessageCount((current) => Math.min(props.activeMessages.length, current + messagePageSize));
+  }
 
   useEffect(() => {
     const pane = messagePaneRef.current;
-    if (!pane || !props.activeThread) {
+    if (!pane || !activeThreadId) {
+      return;
+    }
+    const restoreAnchor = scrollRestoreRef.current;
+    if (restoreAnchor) {
+      pane.scrollTop = restoreAnchor.scrollTop + (pane.scrollHeight - restoreAnchor.scrollHeight);
+      scrollRestoreRef.current = null;
+      return;
+    }
+    if (!shouldStickToBottomRef.current) {
       return;
     }
     const frame = window.requestAnimationFrame(() => {
@@ -684,7 +800,19 @@ function ChatStage(props: {
     return () => {
       window.cancelAnimationFrame(frame);
     };
-  }, [props.activeThread, props.activeMessages.length]);
+  }, [activeThreadId, latestVisibleMessageId, visibleMessageCount]);
+
+  function handleMessagePaneScroll() {
+    const pane = messagePaneRef.current;
+    if (!pane) {
+      return;
+    }
+    const distanceFromBottom = pane.scrollHeight - pane.scrollTop - pane.clientHeight;
+    shouldStickToBottomRef.current = distanceFromBottom < 40;
+    if (pane.scrollTop <= 24 && hiddenMessageCount > 0 && !scrollRestoreRef.current) {
+      revealOlderMessages();
+    }
+  }
 
   return (
     <div className="chat-stage">
@@ -716,7 +844,7 @@ function ChatStage(props: {
         </div>
       </div>
 
-      <div className="message-pane" ref={messagePaneRef}>
+      <div className="message-pane" ref={messagePaneRef} onScroll={handleMessagePaneScroll}>
         {!hasThread ? (
           <div className="message-pane__empty">
             <p>No session selected.</p>
@@ -724,7 +852,13 @@ function ChatStage(props: {
           </div>
         ) : null}
 
-        {props.activeMessages.map((message) => (
+        {hasThread && hiddenMessageCount > 0 ? (
+          <button type="button" className="message-pane__older" onClick={revealOlderMessages}>
+            Show {Math.min(hiddenMessageCount, messagePageSize)} earlier messages
+          </button>
+        ) : null}
+
+        {visibleMessages.map((message) => (
           <MessageBubble key={message.id} message={message} />
         ))}
       </div>
@@ -1247,11 +1381,119 @@ function messageLabel(message: ConversationMessage): string {
 }
 
 function threadDescriptor(thread: ThreadSummary): string {
-  return thread.agentNickname || thread.agentRole || (thread.cwd ? "workspace" : "session");
+  return thread.agentNickname || thread.agentRole || "session";
 }
 
 function threadPreview(thread: ThreadSummary): string {
   return thread.preview || thread.subtitle || thread.cwd || "Open this session to continue the conversation.";
+}
+
+interface ThreadProjectGroup {
+  key: string;
+  label: string;
+  pathLabel: string;
+  threads: ThreadSummary[];
+}
+
+function buildThreadProjectGroups(threads: ThreadSummary[]): ThreadProjectGroup[] {
+  const groups = new Map<string, ThreadProjectGroup>();
+
+  for (const thread of threads) {
+    const normalizedProjectPath = normalizeProjectPath(thread.cwd);
+    const key = normalizedProjectPath ?? "__cloud__";
+    const existing = groups.get(key);
+    if (existing) {
+      existing.threads.push(thread);
+      continue;
+    }
+
+    groups.set(key, {
+      key,
+      label: projectDisplayLabel(normalizedProjectPath),
+      pathLabel: normalizedProjectPath ?? "No local workspace path",
+      threads: [thread],
+    });
+  }
+
+  return Array.from(groups.values());
+}
+
+function normalizeProjectPath(value: string): string | null {
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return null;
+  }
+
+  const normalizedRoot = normalizedFilesystemRootPath(trimmed);
+  if (normalizedRoot) {
+    return normalizedRoot;
+  }
+
+  const normalized = trimmed.replace(/[\\/]+$/, "") || "/";
+  if (!isLikelyFilesystemPath(normalized)) {
+    return null;
+  }
+
+  return normalized;
+}
+
+function normalizedFilesystemRootPath(value: string): string | null {
+  if (value === "/") {
+    return "/";
+  }
+
+  if (value.startsWith("~") && /^~\/+$/.test(value)) {
+    return "~/";
+  }
+
+  if (/^[A-Za-z]:[\\/]+$/.test(value)) {
+    return `${value[0]}:/`;
+  }
+
+  return null;
+}
+
+function isLikelyFilesystemPath(value: string): boolean {
+  if (value === "/") {
+    return true;
+  }
+
+  if (value.startsWith("/") || value.startsWith("~/") || value.startsWith("\\\\")) {
+    return true;
+  }
+
+  return /^[A-Za-z]:[\\/]/.test(value);
+}
+
+function projectDisplayLabel(normalizedProjectPath: string | null): string {
+  if (!normalizedProjectPath) {
+    return "Cloud";
+  }
+
+  const baseLabel = projectBaseDisplayName(normalizedProjectPath);
+  const worktreeToken = codexManagedWorktreeToken(normalizedProjectPath);
+  if (!worktreeToken) {
+    return baseLabel;
+  }
+
+  return `${baseLabel} [${worktreeToken}]`;
+}
+
+function projectBaseDisplayName(normalizedProjectPath: string): string {
+  const parts = normalizedProjectPath.split(/[\\/]/).filter(Boolean);
+  const lastPart = parts.at(-1);
+  return lastPart && lastPart !== "/" ? lastPart : normalizedProjectPath;
+}
+
+function codexManagedWorktreeToken(normalizedProjectPath: string): string | null {
+  const components = normalizedProjectPath.split(/[\\/]/).filter(Boolean);
+  const worktreesIndex = components.indexOf("worktrees");
+  if (worktreesIndex <= 0 || components[worktreesIndex - 1] !== ".codex") {
+    return null;
+  }
+
+  const token = components[worktreesIndex + 1]?.trim();
+  return token || null;
 }
 
 function compactRelayLabel(relayUrl: string): string {

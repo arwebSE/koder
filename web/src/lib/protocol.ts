@@ -7,6 +7,12 @@ import type {
   TrustedMacRecord,
 } from "./types";
 
+interface ThreadListPage {
+  threads: ThreadSummary[];
+  nextCursor: string | null;
+  hasMore: boolean;
+}
+
 export const PAIRING_QR_VERSION = 2;
 export const SECURE_PROTOCOL_VERSION = 1;
 export const SECURE_HANDSHAKE_TAG = "remodex-e2ee-v1";
@@ -72,13 +78,24 @@ export function buildTrustedSessionResolveUrl(relayUrl: string): string {
 }
 
 export function parseThreadList(result: unknown): ThreadSummary[] {
+  return parseThreadListPage(result).threads;
+}
+
+export function parseThreadListPage(result: unknown): ThreadListPage {
   const object = asObject(result);
   const page = asArray(object.data) ?? asArray(object.items) ?? asArray(object.threads) ?? [];
+  const nextCursor = readThreadListCursor(object);
 
-  return page
+  const threads = page
     .map((value) => parseThreadSummary(value))
     .filter((value): value is ThreadSummary => value !== null)
     .sort((left, right) => compareThreadDates(left.updatedAt, right.updatedAt));
+
+  return {
+    threads,
+    nextCursor,
+    hasMore: nextCursor != null,
+  };
 }
 
 export function parseThreadSummary(value: unknown): ThreadSummary | null {
@@ -495,6 +512,18 @@ function createMessage(message: Omit<ConversationMessage, "createdAt"> & { creat
 
 function readMetadataString(metadata: unknown, key: string): string {
   return normalizeString(asObject(metadata)[key]);
+}
+
+function readThreadListCursor(value: Record<string, unknown>): string | null {
+  const candidate = value.nextCursor ?? value.next_cursor ?? null;
+  if (typeof candidate === "string") {
+    const normalized = candidate.trim();
+    return normalized ? normalized : null;
+  }
+  if (typeof candidate === "number" && Number.isFinite(candidate)) {
+    return String(candidate);
+  }
+  return null;
 }
 
 function normalizeString(value: unknown): string {

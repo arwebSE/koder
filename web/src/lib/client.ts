@@ -8,7 +8,7 @@ import {
   buildTrustedSessionResolveUrl,
   notificationText,
   parseApprovalRequest,
-  parseThreadList,
+  parseThreadListPage,
   parseThreadReadMessages,
   parseThreadSummary,
   preferredTrustedMac,
@@ -51,6 +51,7 @@ import type {
 const textEncoder = new TextEncoder();
 const textDecoder = new TextDecoder();
 const WEB_CLIENT_VERSION = "0.2.0";
+const THREAD_LIST_PAGE_LIMIT = 24;
 const REQUEST_TIMEOUT_MS = 20_000;
 const SECURE_CONTROL_TIMEOUT_MS = 12_000;
 const HTTP_REQUEST_TIMEOUT_MS = 10_000;
@@ -97,6 +98,8 @@ export class KoderClient {
     this.snapshot = {
       connection: buildInitialConnectionSummary(this.persistedState),
       threads: [],
+      threadListHasMore: false,
+      threadListNextCursor: null,
       activeThreadId: null,
       messagesByThread: {},
       pendingApprovals: [],
@@ -338,15 +341,29 @@ export class KoderClient {
     }
   }
 
-  async refreshThreads(): Promise<void> {
+  async refreshThreads(options: { append?: boolean } = {}): Promise<void> {
+    const cursor = options.append ? this.snapshot.threadListNextCursor : null;
+    if (options.append && !cursor) {
+      return;
+    }
+
     const params = {
-      limit: 70,
+      limit: THREAD_LIST_PAGE_LIMIT,
       sourceKinds: ["cli", "vscode", "appServer", "exec", "unknown"],
-      cursor: null,
+      cursor,
     };
 
     const response = await this.sendRequest("thread/list", params);
-    const nextThreads = parseThreadList(response.result);
+    const page = parseThreadListPage(response.result);
+    const activeThreadSummary = this.snapshot.activeThreadId
+      ? this.snapshot.threads.find((thread) => thread.id === this.snapshot.activeThreadId) ?? null
+      : null;
+    let nextThreads = options.append
+      ? mergeThreadPages(this.snapshot.threads, page.threads)
+      : page.threads;
+    if (activeThreadSummary && !nextThreads.some((thread) => thread.id === activeThreadSummary.id)) {
+      nextThreads = sortThreads([...nextThreads, activeThreadSummary]);
+    }
     const activeThreadId = this.snapshot.activeThreadId && nextThreads.some((thread) => thread.id === this.snapshot.activeThreadId)
       ? this.snapshot.activeThreadId
       : nextThreads[0]?.id ?? null;
@@ -354,8 +371,14 @@ export class KoderClient {
     this.replaceSnapshot({
       ...this.snapshot,
       threads: nextThreads,
+      threadListHasMore: page.hasMore,
+      threadListNextCursor: page.nextCursor,
       activeThreadId,
     });
+  }
+
+  async loadMoreThreads(): Promise<void> {
+    await this.refreshThreads({ append: true });
   }
 
   async createThread(): Promise<string> {
@@ -369,6 +392,8 @@ export class KoderClient {
     this.resumedThreadIds.add(thread.id);
     this.replaceSnapshot({
       ...this.snapshot,
+      threadListHasMore: this.snapshot.threadListHasMore,
+      threadListNextCursor: this.snapshot.threadListNextCursor,
       messagesByThread: {
         ...this.snapshot.messagesByThread,
         [thread.id]: [],
@@ -1357,11 +1382,7 @@ export class KoderClient {
 
   private upsertThread(thread: ThreadSummary, options: { select?: boolean } = {}): void {
     const existing = this.snapshot.threads.filter((entry) => entry.id !== thread.id);
-    const nextThreads = [...existing, thread].sort((left, right) => {
-      const leftTime = Date.parse(left.updatedAt ?? "") || 0;
-      const rightTime = Date.parse(right.updatedAt ?? "") || 0;
-      return rightTime - leftTime;
-    });
+    const nextThreads = sortThreads([...existing, thread]);
 
     this.replaceSnapshot({
       ...this.snapshot,
@@ -1371,7 +1392,9 @@ export class KoderClient {
   }
 
   private updateThread(threadId: string, updater: (thread: ThreadSummary) => ThreadSummary): void {
-    const nextThreads = this.snapshot.threads.map((thread) => thread.id === threadId ? updater(thread) : thread);
+    const nextThreads = sortThreads(
+      this.snapshot.threads.map((thread) => thread.id === threadId ? updater(thread) : thread)
+    );
     this.replaceSnapshot({
       ...this.snapshot,
       threads: nextThreads,
@@ -1556,6 +1579,25 @@ function buildInitialConnectionSummary(state: PersistedState): ConnectionSummary
 
 function trustedMacList(state: PersistedState): TrustedMacRecord[] {
   return Object.values(state.trustedMacRegistry);
+}
+
+function mergeThreadPages(existing: ThreadSummary[], page: ThreadSummary[]): ThreadSummary[] {
+  const byId = new Map<string, ThreadSummary>();
+  for (const thread of existing) {
+    byId.set(thread.id, thread);
+  }
+  for (const thread of page) {
+    byId.set(thread.id, thread);
+  }
+  return sortThreads(Array.from(byId.values()));
+}
+
+function sortThreads(threads: ThreadSummary[]): ThreadSummary[] {
+  return [...threads].sort((left, right) => {
+    const leftTime = Date.parse(left.updatedAt ?? "") || 0;
+    const rightTime = Date.parse(right.updatedAt ?? "") || 0;
+    return rightTime - leftTime;
+  });
 }
 
 function wireMessageKind(text: string): string {
