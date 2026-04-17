@@ -296,6 +296,11 @@ export class KoderClient {
 
     await this.disconnect({ preservePairing: true, preserveMessages: true });
     this.clearRuntimeState();
+    this.replaceSnapshot({
+      ...this.snapshot,
+      activeThreadId: null,
+      messagesByThread: {},
+    });
 
     if (!options.quiet) {
       this.setBusy(true);
@@ -322,10 +327,6 @@ export class KoderClient {
         label: "End-to-end encrypted",
       });
       await this.refreshThreads();
-      const activeThreadId = this.snapshot.activeThreadId ?? this.snapshot.threads[0]?.id ?? null;
-      if (activeThreadId) {
-        await this.openThread(activeThreadId);
-      }
     } catch (error) {
       const message = error instanceof Error ? error.message : "Connection failed.";
       this.setLastError(message);
@@ -366,7 +367,7 @@ export class KoderClient {
     }
     const activeThreadId = this.snapshot.activeThreadId && nextThreads.some((thread) => thread.id === this.snapshot.activeThreadId)
       ? this.snapshot.activeThreadId
-      : nextThreads[0]?.id ?? null;
+      : null;
 
     this.replaceSnapshot({
       ...this.snapshot,
