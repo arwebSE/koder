@@ -181,7 +181,7 @@ print_web_summary() {
   HTTPS cert  : ${WEB_CERT_CERT}
   Web log     : ${WEB_LOG_FILE}
 
-Open the Browser URL on your phone. If Safari warns that the local certificate is untrusted, you must explicitly trust it before live camera scan will work. Otherwise, use the photo fallback in the page.
+If Safari marks the local certificate as untrusted, trust it first so the HTTPS page loads cleanly.
 Open the Browser URL on your phone and use the direct self-host connect flow.
 EOF
 }
