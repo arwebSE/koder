@@ -1246,6 +1246,8 @@ h1 {
   }
 
   .topbar--compact-chat {
+    flex-direction: row;
+    justify-content: flex-start;
     align-items: center;
     gap: 8px;
   }
@@ -1299,21 +1301,34 @@ h1 {
     background: linear-gradient(135deg, rgba(159, 231, 198, 0.12), rgba(255, 255, 255, 0.04));
   }
 
+  .app-shell--compact-connected {
+    display: grid;
+    grid-template-rows: auto auto minmax(0, 1fr);
+    gap: 8px;
+  }
+
+  .app-shell--compact-connected .topbar,
+  .app-shell--compact-connected .mobile-workspace-nav {
+    margin-bottom: 0;
+  }
+
   .workspace--connected {
-    height: calc(100dvh - 186px);
+    height: auto;
     min-height: 0;
   }
 
   .workspace--connected .sidebar,
   .workspace--connected .hero,
   .workspace--connected .rail {
-    height: calc(100dvh - 186px);
+    height: auto;
     min-height: 0;
   }
 
   .workspace--pane-chat.hero,
   .app-shell--compact-connected .workspace--pane-chat .hero {
-    height: calc(100dvh - 72px);
+    height: auto;
+    min-height: 0;
+    display: flex;
   }
 
   .workspace--pane-sessions .hero,
@@ -1360,6 +1375,8 @@ h1 {
   }
 
   .workspace--pane-chat .chat-stage {
+    grid-template-rows: minmax(0, 1fr) auto auto;
+    flex: 1;
     gap: 8px;
   }
 
@@ -1420,6 +1437,12 @@ h1 {
   .workspace--pane-chat .composer .chip {
     min-height: 42px;
     padding: 0 12px;
+  }
+
+  .workspace--pane-chat .message-pane__empty,
+  .workspace--pane-chat .message-pane__loading {
+    min-height: 140px;
+    padding: 18px;
   }
 
   .message {
@@ -1697,9 +1720,6 @@ h1 {
   }
 
   .topbar--compact-chat {
-    flex-direction: row;
-    align-items: center;
-    justify-content: flex-start;
     min-width: 0;
   }
 
@@ -1813,19 +1833,19 @@ h1 {
   }
 
   .workspace--connected {
-    height: calc(100dvh - 134px);
+    height: auto;
     min-height: 0;
   }
 
   .workspace--connected .sidebar,
   .workspace--connected .hero,
   .workspace--connected .rail {
-    height: calc(100dvh - 134px);
+    height: auto;
     min-height: 0;
   }
 
   .app-shell--compact-connected .workspace--pane-chat .hero {
-    height: calc(100dvh - 56px);
+    height: auto;
   }
 
   .card {
@@ -1912,6 +1932,12 @@ h1 {
     min-height: 38px;
     padding: 0 10px;
     font-size: 0.74rem;
+  }
+
+  .workspace--pane-chat .message-pane__empty,
+  .workspace--pane-chat .message-pane__loading {
+    min-height: 112px;
+    padding: 14px;
   }
 
   .chat-stage__title h2,
