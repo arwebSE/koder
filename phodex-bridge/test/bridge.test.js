@@ -312,3 +312,59 @@ test("sanitizeThreadHistoryImagesForRelay strips bulky compaction replacement hi
     type: "contextCompaction",
   });
 });
+
+test("sanitizeThreadHistoryImagesForRelay keeps only the newest thread/read turns for relay clients", () => {
+  const turns = Array.from({ length: 20 }, (_, index) => ({
+    id: `turn-${index + 1}`,
+    items: [
+      {
+        id: `item-${index + 1}`,
+        type: "assistant_message",
+        content: [{ type: "output_text", text: `message-${index + 1}` }],
+      },
+    ],
+  }));
+
+  const rawMessage = JSON.stringify({
+    id: "req-thread-read-large",
+    result: {
+      thread: {
+        id: "thread-large",
+        turns,
+      },
+    },
+  });
+
+  const sanitized = JSON.parse(
+    sanitizeThreadHistoryImagesForRelay(rawMessage, "thread/read")
+  );
+
+  assert.equal(sanitized.result.thread.turns.length, 12);
+  assert.equal(sanitized.result.thread.turns[0].id, "turn-9");
+  assert.equal(sanitized.result.thread.turns[11].id, "turn-20");
+});
+
+test("sanitizeThreadHistoryImagesForRelay keeps only the newest thread/resume turns for relay clients", () => {
+  const turns = Array.from({ length: 7 }, (_, index) => ({
+    id: `turn-${index + 1}`,
+    items: [],
+  }));
+
+  const rawMessage = JSON.stringify({
+    id: "req-thread-resume-large",
+    result: {
+      thread: {
+        id: "thread-resume-large",
+        turns,
+      },
+    },
+  });
+
+  const sanitized = JSON.parse(
+    sanitizeThreadHistoryImagesForRelay(rawMessage, "thread/resume")
+  );
+
+  assert.equal(sanitized.result.thread.turns.length, 4);
+  assert.equal(sanitized.result.thread.turns[0].id, "turn-4");
+  assert.equal(sanitized.result.thread.turns[3].id, "turn-7");
+});

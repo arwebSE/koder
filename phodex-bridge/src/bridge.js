@@ -52,6 +52,8 @@ const RELAY_WATCHDOG_STALE_AFTER_MS = 25_000;
 const BRIDGE_STATUS_HEARTBEAT_INTERVAL_MS = 5_000;
 const STALE_RELAY_STATUS_MESSAGE = "Relay heartbeat stalled; reconnect pending.";
 const RELAY_HISTORY_IMAGE_REFERENCE_URL = "remodex://history-image-elided";
+const RELAY_THREAD_READ_TURN_LIMIT = 12;
+const RELAY_THREAD_RESUME_TURN_LIMIT = 4;
 function startBridge({
   config: explicitConfig = null,
   printPairingQr = true,
@@ -1336,7 +1338,16 @@ function sanitizeThreadHistoryImagesForRelay(rawMessage, requestMethod) {
   }
 
   let didSanitize = false;
-  const sanitizedTurns = thread.turns.map((turn) => {
+  const turnLimit = requestMethod === "thread/resume"
+    ? RELAY_THREAD_RESUME_TURN_LIMIT
+    : RELAY_THREAD_READ_TURN_LIMIT;
+  const limitedTurns = Array.isArray(thread.turns) && thread.turns.length > turnLimit
+    ? thread.turns.slice(-turnLimit)
+    : thread.turns;
+  if (limitedTurns !== thread.turns) {
+    didSanitize = true;
+  }
+  const sanitizedTurns = limitedTurns.map((turn) => {
     if (!turn || typeof turn !== "object" || !Array.isArray(turn.items)) {
       return turn;
     }
