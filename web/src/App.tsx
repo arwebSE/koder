@@ -115,7 +115,8 @@ function App() {
 
   const visibleError = actionError || snapshot.lastError;
   const isConnected = snapshot.connection.phase === "connected";
-  const showTopbarStatus = isConnected || !isCompactLayout;
+  const isCompactChatPane = isConnected && isCompactLayout && mobilePane === "chat";
+  const showTopbarStatus = (isConnected || !isCompactLayout) && !isCompactChatPane;
 
   async function runAction(actionLabel: string, action: () => Promise<void>) {
     setActionError("");
@@ -252,12 +253,14 @@ function App() {
       <div className="app-shell__glow app-shell__glow--two" />
 
       <header className="topbar">
-        <div className="brand">
+        <div className={`brand ${isCompactChatPane ? "brand--compact-chat" : ""}`}>
           <div className="brand__mark">K</div>
-          <div>
-            <p className="eyebrow">Self-hosted PWA</p>
-            <h1>Koder</h1>
-          </div>
+          {!isCompactChatPane ? (
+            <div>
+              <p className="eyebrow">Self-hosted PWA</p>
+              <h1>Koder</h1>
+            </div>
+          ) : null}
         </div>
 
         {showTopbarStatus ? (
@@ -271,7 +274,7 @@ function App() {
         ) : null}
       </header>
 
-      {isConnected && isCompactLayout ? (
+      {isConnected && isCompactLayout && !isCompactChatPane ? (
         <nav className="mobile-workspace-nav" aria-label="Workspace sections">
           <button
             type="button"
@@ -672,7 +675,7 @@ function ChatStage(props: {
             </button>
           ) : null}
           <div>
-            <p className="eyebrow">Conversation</p>
+            {!props.isCompactLayout ? <p className="eyebrow">Conversation</p> : null}
             <h2>{props.activeThread?.title || "Choose a session to focus the chat"}</h2>
             {!props.isCompactLayout ? (
               <p className="chat-stage__subtitle">
@@ -686,9 +689,11 @@ function ChatStage(props: {
           {props.pendingApprovals.length > 0 ? (
             <span className="pill pill--warn">{props.pendingApprovals.length} approvals</span>
           ) : null}
-          <button type="button" className="chip chip--ghost" onClick={props.onRefresh}>
-            Refresh
-          </button>
+          {!props.isCompactLayout ? (
+            <button type="button" className="chip chip--ghost" onClick={props.onRefresh}>
+              Refresh
+            </button>
+          ) : null}
         </div>
       </div>
 

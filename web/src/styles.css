@@ -219,6 +219,10 @@ ul {
   gap: 14px;
 }
 
+.brand--compact-chat {
+  gap: 0;
+}
+
 .brand__mark {
   display: grid;
   place-items: center;
@@ -1205,6 +1209,10 @@ h1 {
     align-items: stretch;
   }
 
+  .app-shell--compact-connected .topbar {
+    margin-bottom: 8px;
+  }
+
   .quick-pair {
     flex-direction: column;
     align-items: stretch;
@@ -1266,6 +1274,11 @@ h1 {
     min-height: 0;
   }
 
+  .workspace--pane-chat.hero,
+  .app-shell--compact-connected .workspace--pane-chat .hero {
+    height: calc(100dvh - 72px);
+  }
+
   .workspace--pane-sessions .hero,
   .workspace--pane-sessions .rail,
   .workspace--pane-chat .sidebar,
@@ -1307,6 +1320,44 @@ h1 {
   .chat-stage__title {
     width: 100%;
     min-width: 0;
+  }
+
+  .workspace--pane-chat .chat-stage {
+    gap: 8px;
+  }
+
+  .workspace--pane-chat .chat-stage__header {
+    gap: 6px;
+    padding-bottom: 2px;
+  }
+
+  .workspace--pane-chat .chat-stage__title {
+    align-items: center;
+    gap: 8px;
+  }
+
+  .workspace--pane-chat .chat-stage__title h2 {
+    font-size: 0.92rem;
+    line-height: 1.15;
+  }
+
+  .workspace--pane-chat .chat-stage__back {
+    min-height: 30px;
+    padding: 0 10px;
+    font-size: 0.74rem;
+  }
+
+  .workspace--pane-chat .pill {
+    padding: 5px 8px;
+    font-size: 0.68rem;
+  }
+
+  .workspace--pane-chat .composer {
+    gap: 8px;
+  }
+
+  .workspace--pane-chat .composer textarea {
+    min-height: 70px;
   }
 
   .message {
@@ -1579,6 +1630,10 @@ h1 {
     margin-bottom: 10px;
   }
 
+  .app-shell--compact-connected .topbar {
+    margin-bottom: 6px;
+  }
+
   .quick-pair {
     gap: 10px;
     margin-bottom: 10px;
@@ -1601,6 +1656,10 @@ h1 {
 
   .brand {
     gap: 10px;
+  }
+
+  .brand--compact-chat {
+    gap: 0;
   }
 
   .brand__mark {
@@ -1679,6 +1738,10 @@ h1 {
     min-height: 0;
   }
 
+  .app-shell--compact-connected .workspace--pane-chat .hero {
+    height: calc(100dvh - 56px);
+  }
+
   .card {
     border-radius: 18px;
   }
@@ -1709,6 +1772,29 @@ h1 {
 
   .chat-stage {
     gap: 10px;
+  }
+
+  .workspace--pane-chat .chat-stage {
+    gap: 6px;
+  }
+
+  .workspace--pane-chat .chat-stage__header {
+    gap: 4px;
+    padding-bottom: 2px;
+  }
+
+  .workspace--pane-chat .chat-stage__title {
+    gap: 6px;
+  }
+
+  .workspace--pane-chat .chat-stage__title h2 {
+    font-size: 0.86rem;
+  }
+
+  .workspace--pane-chat .chat-stage__back {
+    min-height: 28px;
+    padding: 0 8px;
+    font-size: 0.72rem;
   }
 
   .chat-stage__title h2,
