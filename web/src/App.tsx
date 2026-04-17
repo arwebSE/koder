@@ -1,10 +1,19 @@
-import { FormEvent, KeyboardEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, KeyboardEvent, useEffect, useMemo, useRef, useState } from "react";
 import { PairingQrScanner } from "./components/PairingQrScanner";
 import { KoderClient } from "./lib/client";
 import { parsePairingPayload } from "./lib/protocol";
-import type { ApprovalRequest, ClientSnapshot, ConversationMessage, TrustedMacRecord } from "./lib/types";
+import type {
+  ApprovalRequest,
+  ClientSnapshot,
+  ConversationMessage,
+  ThreadSummary,
+  TrustedMacRecord,
+} from "./lib/types";
 
 const client = new KoderClient();
+const COMPACT_LAYOUT_QUERY = "(max-width: 920px)";
+
+type MobilePane = "sessions" | "chat" | "status";
 
 function App() {
   const [snapshot, setSnapshot] = useState<ClientSnapshot>(client.getSnapshot());
@@ -14,6 +23,8 @@ function App() {
   const [composerText, setComposerText] = useState("");
   const [actionError, setActionError] = useState("");
   const [activeAction, setActiveAction] = useState<string | null>(null);
+  const [mobilePane, setMobilePane] = useState<MobilePane>("sessions");
+  const [isCompactLayout, setIsCompactLayout] = useState(readCompactLayout);
 
   useEffect(() => {
     const unsubscribe = client.subscribe(setSnapshot);
@@ -31,6 +42,36 @@ function App() {
       setRelayUrl(snapshot.connection.relayUrl);
     }
   }, [relayUrl, snapshot.connection.relayUrl]);
+
+  useEffect(() => {
+    if (typeof window === "undefined" || typeof window.matchMedia !== "function") {
+      return;
+    }
+
+    const media = window.matchMedia(COMPACT_LAYOUT_QUERY);
+    const updateLayout = () => {
+      setIsCompactLayout(media.matches);
+    };
+
+    updateLayout();
+    media.addEventListener("change", updateLayout);
+    return () => {
+      media.removeEventListener("change", updateLayout);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (isCompactLayout && snapshot.activeThreadId) {
+      setMobilePane("chat");
+    }
+  }, [isCompactLayout, snapshot.activeThreadId]);
+
+  const activeThread = useMemo(() => {
+    if (!snapshot.activeThreadId) {
+      return null;
+    }
+    return snapshot.threads.find((thread) => thread.id === snapshot.activeThreadId) ?? null;
+  }, [snapshot.activeThreadId, snapshot.threads]);
 
   const activeMessages = useMemo(() => {
     if (!snapshot.activeThreadId) {
@@ -122,6 +163,23 @@ function App() {
     }
   }
 
+  function handleOpenThread(threadId: string) {
+    void runAction(`thread:${threadId}`, () => client.openThread(threadId));
+    if (isCompactLayout) {
+      setMobilePane("chat");
+    }
+  }
+
+  function handleCreateThread() {
+    void runAction("new-thread", async () => {
+      const threadId = await client.createThread();
+      await client.openThread(threadId);
+    });
+    if (isCompactLayout) {
+      setMobilePane("chat");
+    }
+  }
+
   return (
     <div className="app-shell">
       <div className="app-shell__glow app-shell__glow--one" />
@@ -145,258 +203,400 @@ function App() {
         </div>
       </header>
 
-      <main className="workspace">
-        <aside className="sidebar card">
-          <section className="sidebar__section">
-            <div className="card__header">
-              <div>
-                <p className="eyebrow">Connection</p>
-                <h2>Relay state</h2>
-              </div>
-              {isConnected ? (
-                <button
-                  type="button"
-                  className="chip chip--ghost"
-                  onClick={() => {
-                    void runAction("disconnect", () => client.disconnect({ preservePairing: true }));
-                  }}
-                >
-                  Disconnect
-                </button>
-              ) : null}
-            </div>
+      {isConnected && isCompactLayout ? (
+        <nav className="mobile-workspace-nav" aria-label="Workspace sections">
+          <button
+            type="button"
+            className={`mobile-workspace-nav__item ${mobilePane === "sessions" ? "mobile-workspace-nav__item--active" : ""}`}
+            onClick={() => setMobilePane("sessions")}
+          >
+            <span>Sessions</span>
+            <strong>{snapshot.threads.length}</strong>
+          </button>
+          <button
+            type="button"
+            className={`mobile-workspace-nav__item ${mobilePane === "chat" ? "mobile-workspace-nav__item--active" : ""}`}
+            onClick={() => setMobilePane("chat")}
+          >
+            <span>Chat</span>
+            <strong>{activeThread ? "live" : "pick"}</strong>
+          </button>
+          <button
+            type="button"
+            className={`mobile-workspace-nav__item ${mobilePane === "status" ? "mobile-workspace-nav__item--active" : ""}`}
+            onClick={() => setMobilePane("status")}
+          >
+            <span>Status</span>
+            <strong>{snapshot.pendingApprovals.length || visibleError ? "!" : "ok"}</strong>
+          </button>
+        </nav>
+      ) : null}
 
-            <dl className="detail-list">
-              <div>
-                <dt>Secure state</dt>
-                <dd>{snapshot.connection.secureState}</dd>
-              </div>
-              <div>
-                <dt>Relay</dt>
-                <dd>{snapshot.connection.relayUrl || "None yet"}</dd>
-              </div>
-              <div>
-                <dt>Trusted Macs</dt>
-                <dd>{snapshot.trustedMacs.length}</dd>
-              </div>
-            </dl>
-          </section>
-
-          <section className="sidebar__section">
-            <div className="card__header">
-              <div>
-                <p className="eyebrow">Threads</p>
-                <h2>Session rail</h2>
-              </div>
-              <button
-                type="button"
-                className="chip chip--primary"
-                disabled={!isConnected || activeAction === "new-thread"}
-                onClick={() => {
-                  void runAction("new-thread", async () => {
-                    const threadId = await client.createThread();
-                    await client.openThread(threadId);
-                  });
+      <main
+        className={[
+          "workspace",
+          isConnected ? "workspace--connected" : "workspace--onboarding",
+          isCompactLayout ? `workspace--pane-${mobilePane}` : "",
+        ].join(" ")}
+      >
+        {isConnected ? (
+          <>
+            <aside className="sidebar card">
+              <SessionRail
+                connection={snapshot.connection}
+                threads={snapshot.threads}
+                trustedMacCount={snapshot.trustedMacs.length}
+                activeThreadId={snapshot.activeThreadId}
+                activeAction={activeAction}
+                onCreateThread={handleCreateThread}
+                onOpenThread={handleOpenThread}
+                onDisconnect={() => {
+                  void runAction("disconnect", () => client.disconnect({ preservePairing: true }));
                 }}
-              >
-                New
-              </button>
-            </div>
+              />
+            </aside>
 
-            <div className="thread-list">
-              {snapshot.threads.length === 0 ? (
-                <p className="sidebar__empty">No threads yet. Pair a Mac and start one.</p>
-              ) : null}
-              {snapshot.threads.map((thread) => (
-                <button
-                  key={thread.id}
-                  type="button"
-                  className={`thread ${snapshot.activeThreadId === thread.id ? "thread--active" : ""}`}
-                  onClick={() => {
-                    void runAction(`thread:${thread.id}`, () => client.openThread(thread.id));
-                  }}
-                >
-                  <div className="thread__body">
-                    <strong>{thread.title}</strong>
-                    <span>{thread.preview || thread.subtitle || thread.cwd || thread.id}</span>
-                  </div>
-                  <span className="thread__time">{formatRelativeTime(thread.updatedAt)}</span>
-                </button>
-              ))}
-            </div>
-          </section>
-        </aside>
-
-        <section className="hero card">
-          {!isConnected ? (
-            <OnboardingPanel
-              relayUrl={relayUrl}
-              pairingCode={pairingCode}
-              pairingPayloadText={pairingPayloadText}
-              trustedMacs={snapshot.trustedMacs}
-              busyAction={activeAction}
-              onRelayUrlChange={setRelayUrl}
-              onPairingCodeChange={setPairingCode}
-              onPairingPayloadChange={setPairingPayloadText}
-              onPairingCodeSubmit={handlePairingCodeSubmit}
-              onPairingPayloadSubmit={handlePairingPayloadSubmit}
-              onQrScan={handleQrPairing}
-              onReconnect={(macDeviceId) => {
-                void runAction(`reconnect:${macDeviceId}`, () => client.reconnectToTrustedMac(macDeviceId));
-              }}
-              onForget={(macDeviceId) => {
-                client.forgetReconnectCandidate(macDeviceId);
-              }}
-            />
-          ) : (
-            <>
-              <div className="hero__header">
-                <div>
-                  <p className="eyebrow">Workspace</p>
-                  <h2>{snapshot.activeThreadId ? activeThreadTitle(snapshot) : "Open or start a thread"}</h2>
-                </div>
-                <div className="hero__meta">
-                  <span className="pill">Self-hosted</span>
-                  <button
-                    type="button"
-                    className="chip chip--ghost"
-                    onClick={() => {
-                      void runAction("refresh-threads", () => client.refreshThreads());
-                    }}
-                  >
-                    Refresh
-                  </button>
-                </div>
-              </div>
-
-              <div className="message-pane">
-                {activeMessages.length === 0 ? (
-                  <div className="message-pane__empty">
-                    <p>No timeline yet.</p>
-                    <span>Send a message to verify the secure transport end to end.</span>
-                  </div>
-                ) : null}
-                {activeMessages.map((message) => (
-                  <MessageBubble key={message.id} message={message} />
-                ))}
-              </div>
-
-              {snapshot.pendingApprovals.length > 0 ? (
-                <section className="approval-stack">
-                  <div className="card__header">
-                    <div>
-                      <p className="eyebrow">Approvals</p>
-                      <h2>Bridge requests</h2>
-                    </div>
-                  </div>
-                  {snapshot.pendingApprovals.map((approval) => (
-                    <ApprovalCard
-                      key={approval.id}
-                      approval={approval}
-                      busyAction={activeAction}
-                      onDecision={(decision) => {
-                        void runAction(`approval:${approval.id}:${decision}`, () => (
-                          client.respondToApproval(approval.id, decision)
-                        ));
-                      }}
-                    />
-                  ))}
-                </section>
-              ) : null}
-
-              <form className="composer" onSubmit={handleSendSubmit}>
-                <div className="composer__chrome">
-                  <span className="composer__label">Prompt</span>
-                  <span className="composer__hint">Press Cmd/Ctrl+Enter to send</span>
-                </div>
-                <textarea
-                  aria-label="Prompt"
-                  placeholder="Ask the Mac to inspect code, run commands, or edit files."
-                  value={composerText}
-                  onChange={(event) => setComposerText(event.target.value)}
-                  onKeyDown={handleComposerKeyDown}
-                />
-                <div className="composer__actions">
-                  <button
-                    type="button"
-                    className="chip chip--ghost"
-                    onClick={() => setComposerText("")}
-                  >
-                    Clear
-                  </button>
-                  <button
-                    type="submit"
-                    className="chip chip--primary"
-                    disabled={!composerText.trim() || activeAction === "send"}
-                  >
-                    Send
-                  </button>
-                </div>
-              </form>
-            </>
-          )}
-        </section>
-
-        <aside className="rail">
-          <section className="card rail__panel">
-            <div className="card__header">
-              <div>
-                <p className="eyebrow">Health</p>
-                <h2>Session state</h2>
-              </div>
-            </div>
-
-            <div className="stats">
-              <div className={`stat stat--${statusTone(snapshot.connection.phase)}`}>
-                <span>Connection</span>
-                <strong>{snapshot.connection.phase}</strong>
-              </div>
-              <div className="stat stat--neutral">
-                <span>Active thread</span>
-                <strong>{snapshot.activeThreadId ? activeThreadTitle(snapshot) : "None"}</strong>
-              </div>
-              <div className="stat stat--warn">
-                <span>Pending approvals</span>
-                <strong>{snapshot.pendingApprovals.length}</strong>
-              </div>
-            </div>
-          </section>
-
-          <section className="card rail__panel">
-            <div className="card__header">
-              <div>
-                <p className="eyebrow">Pairing</p>
-                <h2>Phone flow</h2>
-              </div>
-            </div>
-            <ul className="bullet-list">
-              <li>Run <code>./run-local-koder.sh --hostname &lt;your-mac-ip&gt;</code> on the Mac.</li>
-              <li>Scan the printed QR first. Koder will route the pairing through this page&apos;s secure relay origin when available.</li>
-              <li>After one successful pair, reconnect comes from the saved trusted Mac record.</li>
-            </ul>
-          </section>
-
-          {visibleError ? (
-            <section className="card rail__panel rail__panel--error">
-              <div className="card__header">
-                <div>
-                  <p className="eyebrow">Last error</p>
-                  <h2>Needs attention</h2>
-                </div>
-                <button
-                  type="button"
-                  className="chip chip--ghost"
-                  onClick={() => setActionError("")}
-                >
-                  Clear
-                </button>
-              </div>
-              <p className="error-copy">{visibleError}</p>
+            <section className="hero card">
+              <ChatStage
+                activeThread={activeThread}
+                activeMessages={activeMessages}
+                composerText={composerText}
+                activeAction={activeAction}
+                pendingApprovals={snapshot.pendingApprovals}
+                isCompactLayout={isCompactLayout}
+                onBackToSessions={() => setMobilePane("sessions")}
+                onComposerChange={setComposerText}
+                onComposerKeyDown={handleComposerKeyDown}
+                onRefresh={() => {
+                  void runAction("refresh-threads", () => client.refreshThreads());
+                }}
+                onSendSubmit={handleSendSubmit}
+                onDecision={(approvalId, decision) => {
+                  void runAction(`approval:${approvalId}:${decision}`, () => (
+                    client.respondToApproval(approvalId, decision)
+                  ));
+                }}
+              />
             </section>
-          ) : null}
-        </aside>
+
+            <aside className="rail card">
+              <StatusRail
+                snapshot={snapshot}
+                visibleError={visibleError}
+                onClearError={() => setActionError("")}
+              />
+            </aside>
+          </>
+        ) : (
+          <>
+            <section className="hero card hero--onboarding">
+              <OnboardingPanel
+                relayUrl={relayUrl}
+                pairingCode={pairingCode}
+                pairingPayloadText={pairingPayloadText}
+                trustedMacs={snapshot.trustedMacs}
+                busyAction={activeAction}
+                onRelayUrlChange={setRelayUrl}
+                onPairingCodeChange={setPairingCode}
+                onPairingPayloadChange={setPairingPayloadText}
+                onPairingCodeSubmit={handlePairingCodeSubmit}
+                onPairingPayloadSubmit={handlePairingPayloadSubmit}
+                onQrScan={handleQrPairing}
+                onReconnect={(macDeviceId) => {
+                  void runAction(`reconnect:${macDeviceId}`, () => client.reconnectToTrustedMac(macDeviceId));
+                }}
+                onForget={(macDeviceId) => {
+                  client.forgetReconnectCandidate(macDeviceId);
+                }}
+              />
+            </section>
+
+            <aside className="rail card rail--support">
+              <StatusRail
+                snapshot={snapshot}
+                visibleError={visibleError}
+                onClearError={() => setActionError("")}
+              />
+            </aside>
+          </>
+        )}
       </main>
     </div>
+  );
+}
+
+function SessionRail(props: {
+  connection: ClientSnapshot["connection"];
+  threads: ThreadSummary[];
+  trustedMacCount: number;
+  activeThreadId: string | null;
+  activeAction: string | null;
+  onCreateThread: () => void;
+  onOpenThread: (threadId: string) => void;
+  onDisconnect: () => void;
+}) {
+  return (
+    <>
+      <section className="sidebar__section sidebar__section--connection">
+        <div className="card__header">
+          <div>
+            <p className="eyebrow">Connection</p>
+            <h2>Live bridge</h2>
+          </div>
+          <button type="button" className="chip chip--ghost" onClick={props.onDisconnect}>
+            Disconnect
+          </button>
+        </div>
+
+        <div className="connection-grid">
+          <article className="connection-tile">
+            <span>State</span>
+            <strong>{props.connection.secureState}</strong>
+          </article>
+          <article className="connection-tile">
+            <span>Mac</span>
+            <strong>{props.connection.macName || "Unknown"}</strong>
+          </article>
+          <article className="connection-tile">
+            <span>Trusted</span>
+            <strong>{props.trustedMacCount}</strong>
+          </article>
+        </div>
+      </section>
+
+      <section className="sidebar__section sidebar__section--threads">
+        <div className="card__header">
+          <div>
+            <p className="eyebrow">Sessions</p>
+            <h2>Thread rail</h2>
+          </div>
+          <button
+            type="button"
+            className="chip chip--primary"
+            disabled={props.activeAction === "new-thread"}
+            onClick={props.onCreateThread}
+          >
+            New
+          </button>
+        </div>
+
+        <div className="thread-list">
+          {props.threads.length === 0 ? (
+            <p className="sidebar__empty">No sessions yet. Start one and it will appear here.</p>
+          ) : null}
+          {props.threads.map((thread) => (
+            <ThreadListItem
+              key={thread.id}
+              thread={thread}
+              active={props.activeThreadId === thread.id}
+              onOpen={() => props.onOpenThread(thread.id)}
+            />
+          ))}
+        </div>
+      </section>
+    </>
+  );
+}
+
+function ThreadListItem(props: { thread: ThreadSummary; active: boolean; onOpen: () => void }) {
+  const descriptor = threadDescriptor(props.thread);
+  const preview = threadPreview(props.thread);
+
+  return (
+    <button
+      type="button"
+      className={`thread ${props.active ? "thread--active" : ""}`}
+      onClick={props.onOpen}
+    >
+      <div className="thread__meta">
+        <span className="thread__badge">{descriptor}</span>
+        <span className="thread__time">{formatRelativeTime(props.thread.updatedAt)}</span>
+      </div>
+      <div className="thread__body">
+        <strong>{props.thread.title}</strong>
+        <p className="thread__preview">{preview}</p>
+      </div>
+    </button>
+  );
+}
+
+function ChatStage(props: {
+  activeThread: ThreadSummary | null;
+  activeMessages: ConversationMessage[];
+  composerText: string;
+  activeAction: string | null;
+  pendingApprovals: ApprovalRequest[];
+  isCompactLayout: boolean;
+  onBackToSessions: () => void;
+  onComposerChange: (value: string) => void;
+  onComposerKeyDown: (event: KeyboardEvent<HTMLTextAreaElement>) => void;
+  onRefresh: () => void;
+  onSendSubmit: (event: FormEvent<HTMLFormElement>) => void;
+  onDecision: (approvalId: string, decision: "accept" | "reject") => void;
+}) {
+  const hasThread = Boolean(props.activeThread);
+  const messagePaneRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    const pane = messagePaneRef.current;
+    if (!pane || !props.activeThread) {
+      return;
+    }
+    const frame = window.requestAnimationFrame(() => {
+      pane.scrollTop = pane.scrollHeight;
+    });
+    return () => {
+      window.cancelAnimationFrame(frame);
+    };
+  }, [props.activeThread, props.activeMessages.length]);
+
+  return (
+    <div className="chat-stage">
+      <div className="chat-stage__header">
+        <div className="chat-stage__title">
+          {props.isCompactLayout ? (
+            <button type="button" className="chat-stage__back" onClick={props.onBackToSessions}>
+              Sessions
+            </button>
+          ) : null}
+          <div>
+            <p className="eyebrow">Conversation</p>
+            <h2>{props.activeThread?.title || "Choose a session to focus the chat"}</h2>
+            <p className="chat-stage__subtitle">
+              {props.activeThread ? threadPreview(props.activeThread) : "The phone view now keeps one conversation in focus instead of dumping the whole workspace on screen."}
+            </p>
+          </div>
+        </div>
+
+        <div className="chat-stage__toolbar">
+          {props.pendingApprovals.length > 0 ? (
+            <span className="pill pill--warn">{props.pendingApprovals.length} approvals</span>
+          ) : null}
+          <button type="button" className="chip chip--ghost" onClick={props.onRefresh}>
+            Refresh
+          </button>
+        </div>
+      </div>
+
+      <div className="message-pane" ref={messagePaneRef}>
+        {!hasThread ? (
+          <div className="message-pane__empty">
+            <p>No session selected.</p>
+            <span>Open a session from the rail and the transcript will stay inside this scrollable pane.</span>
+          </div>
+        ) : null}
+
+        {props.activeMessages.map((message) => (
+          <MessageBubble key={message.id} message={message} />
+        ))}
+      </div>
+
+      {props.pendingApprovals.length > 0 ? (
+        <section className="approval-stack">
+          {props.pendingApprovals.map((approval) => (
+            <ApprovalCard
+              key={approval.id}
+              approval={approval}
+              busyAction={props.activeAction}
+              onDecision={(decision) => props.onDecision(approval.id, decision)}
+            />
+          ))}
+        </section>
+      ) : null}
+
+      <form className="composer" onSubmit={props.onSendSubmit}>
+        <div className="composer__chrome">
+          <span className="composer__label">Prompt</span>
+          <span className="composer__hint">Cmd/Ctrl+Enter sends instantly</span>
+        </div>
+        <textarea
+          aria-label="Prompt"
+          placeholder="Ask the Mac to inspect code, run commands, or edit files."
+          value={props.composerText}
+          onChange={(event) => props.onComposerChange(event.target.value)}
+          onKeyDown={props.onComposerKeyDown}
+        />
+        <div className="composer__actions">
+          <button
+            type="button"
+            className="chip chip--ghost"
+            onClick={() => props.onComposerChange("")}
+          >
+            Clear
+          </button>
+          <button
+            type="submit"
+            className="chip chip--primary"
+            disabled={!props.composerText.trim() || props.activeAction === "send" || !hasThread}
+          >
+            Send
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+}
+
+function StatusRail(props: {
+  snapshot: ClientSnapshot;
+  visibleError: string;
+  onClearError: () => void;
+}) {
+  return (
+    <>
+      <section className="rail__panel rail__panel--stats">
+        <div className="card__header">
+          <div>
+            <p className="eyebrow">Health</p>
+            <h2>Session state</h2>
+          </div>
+        </div>
+
+        <div className="stats">
+          <div className={`stat stat--${statusTone(props.snapshot.connection.phase)}`}>
+            <span>Connection</span>
+            <strong>{props.snapshot.connection.phase}</strong>
+          </div>
+          <div className="stat stat--neutral">
+            <span>Active</span>
+            <strong>{props.snapshot.activeThreadId ? activeThreadTitle(props.snapshot) : "None"}</strong>
+          </div>
+          <div className="stat stat--warn">
+            <span>Approvals</span>
+            <strong>{props.snapshot.pendingApprovals.length}</strong>
+          </div>
+        </div>
+      </section>
+
+      <section className="rail__panel">
+        <div className="card__header">
+          <div>
+            <p className="eyebrow">Pairing</p>
+            <h2>Phone flow</h2>
+          </div>
+        </div>
+        <ul className="bullet-list">
+          <li>Run <code>./run-local-koder.sh --hostname &lt;your-mac-ip&gt;</code> on the Mac.</li>
+          <li>Scan the QR first. Koder now rewrites that pairing onto the secure relay origin used by the page.</li>
+          <li>Reconnect later from the saved trusted Mac card instead of pairing again.</li>
+        </ul>
+      </section>
+
+      {props.visibleError ? (
+        <section className="rail__panel rail__panel--error">
+          <div className="card__header">
+            <div>
+              <p className="eyebrow">Last error</p>
+              <h2>Needs attention</h2>
+            </div>
+            <button type="button" className="chip chip--ghost" onClick={props.onClearError}>
+              Clear
+            </button>
+          </div>
+          <p className="error-copy">{props.visibleError}</p>
+        </section>
+      ) : null}
+    </>
   );
 }
 
@@ -426,9 +626,8 @@ function OnboardingPanel(props: {
       </div>
 
       <p className="hero__lede">
-        Use the advertised relay URL and short pairing code printed by `./run-local-koder.sh`.
+        Use the advertised relay URL and short pairing code printed by <code>./run-local-koder.sh</code>.
         The browser stores its own device key locally, then reconnects through the trusted-session flow.
-        If you have the laptop terminal open, you can now scan the QR directly from here.
       </p>
 
       <div className="onboarding__grid">
@@ -447,7 +646,7 @@ function OnboardingPanel(props: {
             <input
               value={props.relayUrl}
               onChange={(event) => props.onRelayUrlChange(event.target.value)}
-              placeholder="ws://192.168.1.10:9000/relay"
+              placeholder="wss://192.168.1.10:5173/relay"
             />
           </label>
           <label className="field">
@@ -477,7 +676,7 @@ function OnboardingPanel(props: {
             <textarea
               value={props.pairingPayloadText}
               onChange={(event) => props.onPairingPayloadChange(event.target.value)}
-              placeholder='{"v":2,"relay":"ws://.../relay","sessionId":"..."}'
+              placeholder='{"v":2,"relay":"wss://.../relay","sessionId":"..."}'
             />
           </label>
           <button
@@ -589,10 +788,11 @@ function activeThreadTitle(snapshot: ClientSnapshot): string {
 }
 
 function connectionSubline(snapshot: ClientSnapshot): string {
-  if (snapshot.connection.macName) {
-    return `${snapshot.connection.macName} · ${snapshot.connection.relayUrl || "no relay saved"}`;
+  const relayHost = compactRelayLabel(snapshot.connection.relayUrl);
+  if (snapshot.connection.macName && relayHost) {
+    return `${snapshot.connection.macName} · ${relayHost}`;
   }
-  return snapshot.connection.relayUrl || "No relay paired yet";
+  return snapshot.connection.macName || relayHost || "No relay paired yet";
 }
 
 function statusTone(phase: ClientSnapshot["connection"]["phase"]): "good" | "warn" | "neutral" | "bad" {
@@ -627,7 +827,38 @@ function messageLabel(message: ConversationMessage): string {
   if (message.role === "assistant" && message.isStreaming) {
     return "Assistant · streaming";
   }
-  return `${message.role} · ${message.kind}`;
+
+  const role = message.role.charAt(0).toUpperCase() + message.role.slice(1);
+  const kind = message.kind.replace(/([A-Z])/g, " $1").toLowerCase();
+  return `${role} · ${kind}`;
+}
+
+function threadDescriptor(thread: ThreadSummary): string {
+  return thread.agentNickname || thread.agentRole || (thread.cwd ? "workspace" : "session");
+}
+
+function threadPreview(thread: ThreadSummary): string {
+  return thread.preview || thread.subtitle || thread.cwd || "Open this session to continue the conversation.";
+}
+
+function compactRelayLabel(relayUrl: string): string {
+  if (!relayUrl) {
+    return "";
+  }
+
+  try {
+    const url = new URL(relayUrl);
+    return url.host;
+  } catch {
+    return relayUrl;
+  }
+}
+
+function readCompactLayout(): boolean {
+  if (typeof window === "undefined" || typeof window.matchMedia !== "function") {
+    return false;
+  }
+  return window.matchMedia(COMPACT_LAYOUT_QUERY).matches;
 }
 
 function formatRelativeTime(value: string | null): string {
