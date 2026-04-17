@@ -78,6 +78,7 @@ export class KoderClient {
   private snapshot: ClientSnapshot;
   private listeners = new Set<Listener>();
   private socket: WebSocket | null = null;
+  private restorePromise: Promise<void> | null = null;
   private secureSession: SecureSessionState | null = null;
   private pendingRequests = new Map<string, {
     resolve: (message: RpcMessage) => void;
@@ -117,10 +118,26 @@ export class KoderClient {
   }
 
   async restoreConnection(): Promise<void> {
-    if (this.snapshot.connection.phase === "connecting" || this.snapshot.connection.phase === "connected") {
+    if (this.restorePromise) {
+      return this.restorePromise;
+    }
+    if (
+      this.snapshot.connection.phase === "restoring"
+      || this.snapshot.connection.phase === "connecting"
+      || this.snapshot.connection.phase === "connected"
+    ) {
       return;
     }
 
+    this.restorePromise = this.restoreConnectionInternal();
+    try {
+      await this.restorePromise;
+    } finally {
+      this.restorePromise = null;
+    }
+  }
+
+  private async restoreConnectionInternal(): Promise<void> {
     this.setConnection({
       phase: "restoring",
       label: "Restoring saved pair...",
