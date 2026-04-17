@@ -362,6 +362,7 @@ function App() {
                 trustedMacCount={snapshot.trustedMacs.length}
                 activeThreadId={snapshot.activeThreadId}
                 activeAction={activeAction}
+                isCompactLayout={isCompactLayout}
                 onCreateThread={handleCreateThread}
                 onOpenThread={handleOpenThread}
                 onDisconnect={() => {
@@ -466,44 +467,47 @@ function SessionRail(props: {
   trustedMacCount: number;
   activeThreadId: string | null;
   activeAction: string | null;
+  isCompactLayout: boolean;
   onCreateThread: () => void;
   onOpenThread: (threadId: string) => void;
   onDisconnect: () => void;
 }) {
   return (
     <>
-      <section className="sidebar__section sidebar__section--connection">
-        <div className="card__header">
-          <div>
-            <p className="eyebrow">Connection</p>
-            <h2>Live bridge</h2>
+      {!props.isCompactLayout ? (
+        <section className="sidebar__section sidebar__section--connection">
+          <div className="card__header">
+            <div>
+              <p className="eyebrow">Connection</p>
+              <h2>Live bridge</h2>
+            </div>
+            <button type="button" className="chip chip--ghost" onClick={props.onDisconnect}>
+              Disconnect
+            </button>
           </div>
-          <button type="button" className="chip chip--ghost" onClick={props.onDisconnect}>
-            Disconnect
-          </button>
-        </div>
 
-        <div className="connection-grid">
-          <article className="connection-tile">
-            <span>State</span>
-            <strong>{props.connection.secureState}</strong>
-          </article>
-          <article className="connection-tile">
-            <span>Mac</span>
-            <strong>{props.connection.macName || "Unknown"}</strong>
-          </article>
-          <article className="connection-tile">
-            <span>Trusted</span>
-            <strong>{props.trustedMacCount}</strong>
-          </article>
-        </div>
-      </section>
+          <div className="connection-grid">
+            <article className="connection-tile">
+              <span>State</span>
+              <strong>{props.connection.secureState}</strong>
+            </article>
+            <article className="connection-tile">
+              <span>Mac</span>
+              <strong>{props.connection.macName || "Unknown"}</strong>
+            </article>
+            <article className="connection-tile">
+              <span>Trusted</span>
+              <strong>{props.trustedMacCount}</strong>
+            </article>
+          </div>
+        </section>
+      ) : null}
 
       <section className="sidebar__section sidebar__section--threads">
         <div className="card__header">
           <div>
             <p className="eyebrow">Sessions</p>
-            <h2>Thread rail</h2>
+            <h2>{props.isCompactLayout ? "Recent sessions" : "Thread rail"}</h2>
           </div>
           <button
             type="button"
@@ -597,9 +601,11 @@ function ChatStage(props: {
           <div>
             <p className="eyebrow">Conversation</p>
             <h2>{props.activeThread?.title || "Choose a session to focus the chat"}</h2>
-            <p className="chat-stage__subtitle">
-              {props.activeThread ? threadPreview(props.activeThread) : "The phone view now keeps one conversation in focus instead of dumping the whole workspace on screen."}
-            </p>
+            {!props.isCompactLayout ? (
+              <p className="chat-stage__subtitle">
+                {props.activeThread ? threadPreview(props.activeThread) : "The phone view now keeps one conversation in focus instead of dumping the whole workspace on screen."}
+              </p>
+            ) : null}
           </div>
         </div>
 
