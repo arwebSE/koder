@@ -12,7 +12,7 @@ This document intentionally avoids any private hosted-service details. If you ar
 The public source tree is local-first and self-host friendly:
 
 - there is no public production relay baked into the GitHub source
-- local browser access should work out of the box with `./run-local-koder.sh`
+- local browser access should work out of the box with `./start.sh --ip <host>`
 - internet-facing setups should pass their own relay URL explicitly with `REMODEX_RELAY`
 - the browser connects directly to the live bridge on your host, then later reconnects can reuse that trust through the relay
 - the built-in background daemon for trusted reconnect is currently macOS-only
@@ -48,7 +48,7 @@ From the repo root:
 ```sh
 git clone https://github.com/arwebSE/koder.git
 cd koder
-./run-local-koder.sh
+./start.sh --ip 192.168.1.10
 ```
 
 What this does:
@@ -71,7 +71,7 @@ Then:
 Pass a hostname or IP address that the phone can actually reach:
 
 ```sh
-./run-local-koder.sh --hostname 192.168.1.10
+./start.sh --ip 192.168.1.10
 ```
 
 ### Health check
@@ -229,7 +229,7 @@ Check:
 Try a concrete LAN IP:
 
 ```sh
-./run-local-koder.sh --hostname 192.168.1.10
+./start.sh --ip 192.168.1.10
 ```
 
 If local LAN access still fails even though the relay health check works, prefer a Tailscale-reachable relay instead of continuing to rely on plain same-Wi-Fi routing.

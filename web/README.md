@@ -8,7 +8,7 @@ For normal self-hosted testing, use the repo-root launcher so relay, bridge, and
 
 ```sh
 cd remodex
-./run-local-koder.sh --hostname 192.168.1.10
+./start.sh --ip 192.168.1.10
 ```
 
 That prints the browser URL for your phone plus the secure relay URL, pairing code, and QR payload bootstrap info. The phone UI can scan the terminal QR directly, or fall back to a photo/manual entry path. The web client is now expected to run over HTTPS so mobile camera APIs can work.

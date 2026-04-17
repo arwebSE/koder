@@ -29,7 +29,7 @@ The product direction is now simple:
 
 ## Access Model
 
-- Open the PWA from the same host or IP that is running `./run-local-koder.sh`
+- Open the PWA from the same host or IP that is running `./start.sh --ip <host>`
 - The browser attaches directly to the live self-hosted bridge on that host
 - Trusted reconnect can still exist as a convenience, but browser-first direct bootstrap is the default flow
 

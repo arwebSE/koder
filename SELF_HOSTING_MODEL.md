@@ -32,7 +32,7 @@ The public repo now also includes the trusted-Mac reconnect flow, but the built-
 
 If you use the public repo, you should expect one of these flows:
 
-1. Local LAN browser access on your own machine with `./run-local-koder.sh`
+1. Local LAN browser access on your own machine with `./start.sh --ip <host>`
 2. A self-hosted relay on your own VPS, passed in through `REMODEX_RELAY`
 
 That means:
@@ -49,7 +49,7 @@ For most GitHub users, the easiest first step is:
 ```sh
 git clone https://github.com/arwebSE/koder.git
 cd koder
-./run-local-koder.sh
+./start.sh --ip 192.168.1.10
 ```
 
 For the full public setup guide, read [Docs/self-hosting.md](Docs/self-hosting.md).
@@ -95,7 +95,7 @@ Those belong in your own environment, private config, or release pipeline.
 If you cloned Koder from GitHub:
 
 - do not expect a private hosted relay to be built in
-- use `./run-local-koder.sh` for local testing
+- use `./start.sh --ip <host>` for local testing
 - use `REMODEX_RELAY` for your own VPS or hosted relay
 - use the browser client to trust the Mac, then let reconnect reuse that trust
 - remember that the built-in daemon/background service path is currently macOS-only

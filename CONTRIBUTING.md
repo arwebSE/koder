@@ -50,7 +50,7 @@ git clone https://github.com/arwebSE/koder.git
 cd koder
 
 # Start a local relay + bridge together
-./run-local-koder.sh
+./start.sh --ip 192.168.1.10
 ```
 
 This launcher:
@@ -75,7 +75,7 @@ That runs `koder up`, which:
 
 ### Testing a full local session
 
-1. Start the local launcher: `./run-local-koder.sh`
+1. Start the local launcher: `./start.sh --ip 192.168.1.10`
 2. Open the printed browser URL on your phone
 3. Create a new thread from the app
 4. Send a message — you should see Codex respond in real-time

@@ -845,7 +845,7 @@ function StatusRail(props: {
           </div>
         </div>
         <ul className="bullet-list">
-          <li>Run <code>./run-local-koder.sh --hostname &lt;your-mac-ip&gt;</code> on the Mac.</li>
+          <li>Run <code>./start.sh --ip &lt;your-mac-ip&gt;</code> on the Mac.</li>
           <li>Open this PWA from that same host or IP and Koder attaches directly to the live bridge.</li>
           <li>Everything stays self-hosted. There is no hosted cloud or QR-first onboarding path anymore.</li>
         </ul>
@@ -894,7 +894,7 @@ function DirectConnectPanel(props: {
       </div>
 
       <p className="hero__lede">
-        Open the PWA from the same host or IP that is running <code>./run-local-koder.sh</code>. This browser now attaches straight to the live machine session on that host, without any QR, code, or legacy iOS pairing flow.
+        Open the PWA from the same host or IP that is running <code>./start.sh --ip &lt;your-mac-ip&gt;</code>. This browser now attaches straight to the live machine session on that host, without any QR, code, or legacy iOS pairing flow.
       </p>
 
       <div className="onboarding__focus onboarding__focus--direct">

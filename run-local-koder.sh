@@ -43,6 +43,11 @@ die() {
 parse_args() {
   while [[ $# -gt 0 ]]; do
     case "$1" in
+      --ip)
+        shift
+        [[ $# -gt 0 ]] || die "--ip requires a value"
+        RELAY_HOSTNAME="$1"
+        ;;
       --hostname)
         shift
         [[ $# -gt 0 ]] || die "--hostname requires a value"

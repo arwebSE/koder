@@ -48,7 +48,7 @@ See [Docs/KODER_PRODUCT_SPEC.md](Docs/KODER_PRODUCT_SPEC.md) for the current wor
 ```sh
 git clone https://github.com/arwebSE/koder.git
 cd koder
-./run-local-koder.sh
+./start.sh --ip 192.168.1.10
 ```
 
 That starts:
