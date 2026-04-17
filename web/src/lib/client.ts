@@ -101,6 +101,7 @@ export class KoderClient {
       threadListHasMore: false,
       threadListNextCursor: null,
       activeThreadId: null,
+      loadingThreadId: null,
       messagesByThread: {},
       pendingApprovals: [],
       trustedMacs: trustedMacList(this.persistedState),
@@ -299,6 +300,7 @@ export class KoderClient {
     this.replaceSnapshot({
       ...this.snapshot,
       activeThreadId: null,
+      loadingThreadId: null,
       messagesByThread: {},
     });
 
@@ -375,6 +377,7 @@ export class KoderClient {
       threadListHasMore: page.hasMore,
       threadListNextCursor: page.nextCursor,
       activeThreadId,
+      loadingThreadId: activeThreadId === this.snapshot.loadingThreadId ? this.snapshot.loadingThreadId : null,
     });
   }
 
@@ -407,24 +410,20 @@ export class KoderClient {
     this.replaceSnapshot({
       ...this.snapshot,
       activeThreadId: threadId,
+      loadingThreadId: threadId,
     });
 
-    if (!this.resumedThreadIds.has(threadId)) {
-      try {
-        const resumeResponse = await this.sendRequest("thread/resume", { threadId });
-        const resumedThread = parseThreadSummary(asObject(asObject(resumeResponse.result).thread));
-        if (resumedThread) {
-          this.upsertThread(resumedThread);
-        }
-      } catch {
-        // Best effort only. Some runtimes keep thread/read usable even if resume fails.
-      }
-      this.resumedThreadIds.add(threadId);
+    try {
+      const readResponse = await this.sendRequest("thread/read", { threadId, includeTurns: true });
+      const messages = parseThreadReadMessages(threadId, readResponse.result);
+      this.replaceThreadMessages(threadId, messages);
+    } catch (error) {
+      this.replaceSnapshot({
+        ...this.snapshot,
+        loadingThreadId: this.snapshot.loadingThreadId === threadId ? null : this.snapshot.loadingThreadId,
+      });
+      throw error;
     }
-
-    const readResponse = await this.sendRequest("thread/read", { threadId, includeTurns: true });
-    const messages = parseThreadReadMessages(threadId, readResponse.result);
-    this.replaceThreadMessages(threadId, messages);
   }
 
   async sendMessage(text: string): Promise<void> {
@@ -447,7 +446,7 @@ export class KoderClient {
 
     try {
       if (!this.resumedThreadIds.has(threadId)) {
-        await this.openThread(threadId);
+        await this.resumeThread(threadId);
       }
       const response = await this.sendRequest("turn/start", {
         threadId,
@@ -522,6 +521,7 @@ export class KoderClient {
       this.replaceSnapshot({
         ...this.snapshot,
         messagesByThread: {},
+        loadingThreadId: null,
       });
     }
 
@@ -1405,11 +1405,29 @@ export class KoderClient {
   private replaceThreadMessages(threadId: string, messages: ConversationMessage[]): void {
     this.replaceSnapshot({
       ...this.snapshot,
+      loadingThreadId: this.snapshot.loadingThreadId === threadId ? null : this.snapshot.loadingThreadId,
       messagesByThread: {
         ...this.snapshot.messagesByThread,
         [threadId]: messages,
       },
     });
+  }
+
+  private async resumeThread(threadId: string): Promise<void> {
+    if (this.resumedThreadIds.has(threadId)) {
+      return;
+    }
+
+    try {
+      const resumeResponse = await this.sendRequest("thread/resume", { threadId });
+      const resumedThread = parseThreadSummary(asObject(asObject(resumeResponse.result).thread));
+      if (resumedThread) {
+        this.upsertThread(resumedThread);
+      }
+    } catch {
+      // Best effort only. Some runtimes keep turn/start usable even if resume fails.
+    }
+    this.resumedThreadIds.add(threadId);
   }
 
   private appendOptimisticUserMessage(threadId: string, text: string): string {

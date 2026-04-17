@@ -39,13 +39,16 @@
 html,
 body,
 #root {
+  height: 100%;
   min-height: 100%;
+  overscroll-behavior: none;
 }
 
 body {
   margin: 0;
   min-width: 320px;
   color: var(--text);
+  overflow: hidden;
   overflow-x: clip;
   background:
     radial-gradient(circle at top left, rgba(159, 231, 198, 0.08), transparent 22%),
@@ -127,6 +130,12 @@ ul {
   min-height: 100dvh;
   padding: max(18px, env(safe-area-inset-top)) clamp(14px, 3vw, 24px) max(18px, env(safe-area-inset-bottom));
   overflow-x: clip;
+  overflow-y: auto;
+}
+
+.app-shell--compact-connected {
+  height: 100dvh;
+  overflow: hidden;
 }
 
 .app-shell__glow {
@@ -457,6 +466,8 @@ h1 {
   padding-right: 4px;
   scrollbar-gutter: stable;
   min-width: 0;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
 }
 
 .thread {
@@ -529,6 +540,20 @@ h1 {
   gap: 8px;
 }
 
+.thread-group--compact {
+  gap: 6px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+.thread-group--compact + .thread-group--compact {
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
 .thread-list__footer {
   width: 100%;
 }
@@ -543,6 +568,33 @@ h1 {
 .thread--active {
   border-color: rgba(124, 247, 212, 0.24);
   background: linear-gradient(135deg, rgba(159, 231, 198, 0.12), rgba(255, 255, 255, 0.04));
+}
+
+.thread--compact {
+  gap: 6px;
+  padding: 10px 4px 12px;
+  border: 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.thread--compact:hover,
+.thread--compact:focus-visible {
+  transform: none;
+  border-color: rgba(255, 255, 255, 0.07);
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.thread-group--compact .thread:last-child {
+  border-bottom: 0;
+}
+
+.thread--compact.thread--active {
+  border-radius: 16px;
+  border-bottom-color: transparent;
+  background: linear-gradient(135deg, rgba(159, 231, 198, 0.1), rgba(255, 255, 255, 0.03));
 }
 
 .thread__meta {
@@ -726,6 +778,8 @@ h1 {
   padding-right: 6px;
   scrollbar-gutter: stable;
   min-width: 0;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
 }
 
 .message-pane__empty {
@@ -740,7 +794,24 @@ h1 {
   text-align: center;
 }
 
+.message-pane__loading {
+  display: grid;
+  gap: 8px;
+  place-items: center;
+  min-height: 220px;
+  padding: 24px;
+  border: 1px dashed rgba(159, 231, 198, 0.18);
+  border-radius: 26px;
+  background: rgba(159, 231, 198, 0.05);
+  text-align: center;
+}
+
 .message-pane__empty span {
+  color: var(--muted);
+  max-width: 32rem;
+}
+
+.message-pane__loading span {
   color: var(--muted);
   max-width: 32rem;
 }
@@ -819,6 +890,8 @@ h1 {
 .approval-stack,
 .trusted-grid {
   overflow: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
 }
 
 .approval-card,
@@ -1164,13 +1237,15 @@ h1 {
   }
 
   .workspace--connected {
-    min-height: calc(100dvh - 186px);
+    height: calc(100dvh - 186px);
+    min-height: 0;
   }
 
   .workspace--connected .sidebar,
   .workspace--connected .hero,
   .workspace--connected .rail {
-    min-height: calc(100dvh - 186px);
+    height: calc(100dvh - 186px);
+    min-height: 0;
   }
 
   .workspace--pane-sessions .hero,
@@ -1186,6 +1261,17 @@ h1 {
   .rail,
   .hero {
     padding: 16px;
+  }
+
+  .sidebar--flat,
+  .hero--flat,
+  .rail--flat {
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+    backdrop-filter: none;
   }
 
   .chat-stage__header,
@@ -1357,6 +1443,17 @@ h1 {
     font-size: 0.76rem;
   }
 
+  .sidebar__section--flat {
+    padding: 0;
+    border: 0;
+    background: transparent;
+    box-shadow: none;
+  }
+
+  .sidebar__section--flat .card__header {
+    padding: 0 4px;
+  }
+
   .hero--onboarding-compact .connection-tile,
   .hero--onboarding-compact .trusted-card {
     padding: 12px;
@@ -1378,6 +1475,15 @@ h1 {
   .thread-group {
     padding: 9px;
     border-radius: 18px;
+  }
+
+  .thread-group--compact {
+    padding: 0;
+    border-radius: 0;
+  }
+
+  .thread-group--compact .thread-group__header {
+    padding: 0 4px;
   }
 
   .thread-group__copy strong {
@@ -1544,13 +1650,15 @@ h1 {
   }
 
   .workspace--connected {
-    min-height: calc(100dvh - 134px);
+    height: calc(100dvh - 134px);
+    min-height: 0;
   }
 
   .workspace--connected .sidebar,
   .workspace--connected .hero,
   .workspace--connected .rail {
-    min-height: calc(100dvh - 134px);
+    height: calc(100dvh - 134px);
+    min-height: 0;
   }
 
   .card {
@@ -1697,6 +1805,12 @@ h1 {
     border-radius: 16px;
   }
 
+  .thread-group--compact {
+    gap: 5px;
+    padding: 0;
+    border-radius: 0;
+  }
+
   .thread-group__copy strong {
     font-size: 0.8rem;
   }
@@ -1767,6 +1881,12 @@ h1 {
 
   .message-pane__empty {
     min-height: 180px;
+    padding: 16px;
+    border-radius: 18px;
+  }
+
+  .message-pane__loading {
+    min-height: 156px;
     padding: 16px;
     border-radius: 18px;
   }

@@ -109,6 +109,7 @@ export interface ClientSnapshot {
   threadListHasMore: boolean;
   threadListNextCursor: string | null;
   activeThreadId: string | null;
+  loadingThreadId: string | null;
   messagesByThread: Record<string, ConversationMessage[]>;
   pendingApprovals: ApprovalRequest[];
   trustedMacs: TrustedMacRecord[];

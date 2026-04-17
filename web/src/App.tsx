@@ -217,20 +217,22 @@ function App() {
   }
 
   function handleOpenThread(threadId: string) {
-    void runAction(`thread:${threadId}`, () => client.openThread(threadId));
-    if (isCompactLayout) {
-      setMobilePane("chat");
-    }
+    void runAction(`thread:${threadId}`, async () => {
+      await client.openThread(threadId);
+      if (isCompactLayout) {
+        setMobilePane("chat");
+      }
+    });
   }
 
   function handleCreateThread() {
     void runAction("new-thread", async () => {
       const threadId = await client.createThread();
       await client.openThread(threadId);
+      if (isCompactLayout) {
+        setMobilePane("chat");
+      }
     });
-    if (isCompactLayout) {
-      setMobilePane("chat");
-    }
   }
 
   useEffect(() => {
@@ -308,7 +310,13 @@ function App() {
   }
 
   return (
-    <div className="app-shell">
+    <div
+      className={[
+        "app-shell",
+        isConnected ? "app-shell--connected" : "",
+        isConnected && isCompactLayout ? "app-shell--compact-connected" : "",
+      ].join(" ")}
+    >
       <div className="app-shell__glow app-shell__glow--one" />
       <div className="app-shell__glow app-shell__glow--two" />
 
@@ -419,7 +427,7 @@ function App() {
       >
         {isConnected ? (
           <>
-            <aside className="sidebar card">
+            <aside className={`sidebar ${isCompactLayout ? "sidebar--flat" : "card"}`}>
               <SessionRail
                 connection={snapshot.connection}
                 threads={snapshot.threads}
@@ -439,7 +447,7 @@ function App() {
               />
             </aside>
 
-            <section className="hero card">
+            <section className={`hero ${isCompactLayout ? "hero--flat" : "card"}`}>
               <ChatStage
                 activeThread={activeThread}
                 activeMessages={activeMessages}
@@ -447,6 +455,7 @@ function App() {
                 activeAction={activeAction}
                 pendingApprovals={snapshot.pendingApprovals}
                 isCompactLayout={isCompactLayout}
+                isThreadLoading={snapshot.loadingThreadId === snapshot.activeThreadId}
                 onBackToSessions={() => setMobilePane("sessions")}
                 onComposerChange={setComposerText}
                 onComposerKeyDown={handleComposerKeyDown}
@@ -462,7 +471,7 @@ function App() {
               />
             </section>
 
-            <aside className="rail card">
+            <aside className={`rail ${isCompactLayout ? "rail--flat" : "card"}`}>
               <StatusRail
                 snapshot={snapshot}
                 visibleError={visibleError}
@@ -646,7 +655,7 @@ function SessionRail(props: {
         </section>
       ) : null}
 
-      <section className="sidebar__section sidebar__section--threads">
+      <section className={`sidebar__section sidebar__section--threads ${props.isCompactLayout ? "sidebar__section--flat" : ""}`}>
         <div className="card__header">
           <div>
             <p className="eyebrow">Sessions</p>
@@ -667,7 +676,7 @@ function SessionRail(props: {
             <p className="sidebar__empty">No sessions yet. Start one and it will appear here.</p>
           ) : null}
           {threadGroups.map((group) => (
-            <section key={group.key} className="thread-group">
+            <section key={group.key} className={`thread-group ${props.isCompactLayout ? "thread-group--compact" : ""}`}>
               <header className="thread-group__header">
                 <div className="thread-group__copy">
                   <strong>{group.label}</strong>
@@ -682,6 +691,7 @@ function SessionRail(props: {
                     key={thread.id}
                     thread={thread}
                     active={props.activeThreadId === thread.id}
+                    compact={props.isCompactLayout}
                     onOpen={() => props.onOpenThread(thread.id)}
                   />
                 ))}
@@ -704,14 +714,14 @@ function SessionRail(props: {
   );
 }
 
-function ThreadListItem(props: { thread: ThreadSummary; active: boolean; onOpen: () => void }) {
+function ThreadListItem(props: { thread: ThreadSummary; active: boolean; compact?: boolean; onOpen: () => void }) {
   const descriptor = threadDescriptor(props.thread);
   const preview = threadPreview(props.thread);
 
   return (
     <button
       type="button"
-      className={`thread ${props.active ? "thread--active" : ""}`}
+      className={`thread ${props.compact ? "thread--compact" : ""} ${props.active ? "thread--active" : ""}`}
       onClick={props.onOpen}
     >
       <div className="thread__meta">
@@ -733,6 +743,7 @@ function ChatStage(props: {
   activeAction: string | null;
   pendingApprovals: ApprovalRequest[];
   isCompactLayout: boolean;
+  isThreadLoading: boolean;
   onBackToSessions: () => void;
   onComposerChange: (value: string) => void;
   onComposerKeyDown: (event: KeyboardEvent<HTMLTextAreaElement>) => void;
@@ -852,7 +863,14 @@ function ChatStage(props: {
           </div>
         ) : null}
 
-        {hasThread && hiddenMessageCount > 0 ? (
+        {hasThread && props.isThreadLoading && props.activeMessages.length === 0 ? (
+          <div className="message-pane__loading">
+            <p>Loading session…</p>
+            <span>Koder is pulling the transcript from the Mac before opening this chat.</span>
+          </div>
+        ) : null}
+
+        {hasThread && !props.isThreadLoading && hiddenMessageCount > 0 ? (
           <button type="button" className="message-pane__older" onClick={revealOlderMessages}>
             Show {Math.min(hiddenMessageCount, messagePageSize)} earlier messages
           </button>
