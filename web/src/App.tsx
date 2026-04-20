@@ -233,7 +233,7 @@ function App() {
       }
       await showSystemNotification({
         title: "Koder alerts enabled",
-        body: "You will now receive local assistant and approval notifications while this PWA stays connected.",
+        body: "You will now receive local assistant and approval notifications while this browser session stays connected.",
         tag: "alerts-enabled",
         url: "/",
         silent: true,
@@ -264,7 +264,7 @@ function App() {
             </div>
           ) : (
             <div>
-              <p className="eyebrow">Self-hosted PWA</p>
+              <p className="eyebrow">Self-hosted browser client</p>
               <h1>Koder</h1>
             </div>
           )}
@@ -815,7 +815,7 @@ function StatusRail(props: {
       <section className="rail__panel">
         <div className="card__header">
           <div>
-            <p className="eyebrow">PWA</p>
+            <p className="eyebrow">Browser support</p>
             <h2>Install and alerts</h2>
           </div>
         </div>
@@ -830,7 +830,7 @@ function StatusRail(props: {
           </article>
         </div>
         <p className="rail__hint">
-          Installed mode is what unlocks stronger PWA behavior later. Right now the browser can already raise local system alerts while a live session is connected.
+          Core connect and chat work in a modern browser over HTTPS. Installed mode, badges, and notifications stay optional enhancements that depend on browser support.
         </p>
         {props.canUseNotifications && props.notificationPermission !== "granted" ? (
           <button
@@ -853,7 +853,7 @@ function StatusRail(props: {
         </div>
         <ul className="bullet-list">
           <li>Run <code>./start.sh --ip &lt;your-mac-ip&gt;</code> on the Mac.</li>
-          <li>Open this PWA from that same host or IP and Koder attaches directly to the live bridge.</li>
+          <li>Open this browser client from that same host or IP and Koder attaches directly to the live bridge.</li>
           <li>Everything stays self-hosted. There is no hosted cloud or QR-first onboarding path anymore.</li>
         </ul>
       </section>
@@ -901,7 +901,7 @@ function DirectConnectPanel(props: {
       </div>
 
       <p className="hero__lede">
-        Open the PWA from the same host or IP that is running <code>./start.sh --ip &lt;your-mac-ip&gt;</code>. This browser now attaches straight to the live machine session on that host, without any QR, code, or legacy iOS pairing flow.
+        Open this browser client from the same host or IP that is running <code>./start.sh --ip &lt;your-mac-ip&gt;</code>. Koder attaches straight to the live machine session on that host, without any QR, code, or legacy iOS pairing flow.
       </p>
 
       <div className="onboarding__focus onboarding__focus--direct">

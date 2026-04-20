@@ -202,8 +202,8 @@ print_web_summary() {
   HTTPS cert  : ${WEB_CERT_CERT}
   Web log     : ${WEB_LOG_FILE}
 
-If Safari marks the local certificate as untrusted, trust it first so the HTTPS page loads cleanly.
-Open the Browser URL on your phone and use the direct self-host connect flow.
+If the browser marks the local certificate as untrusted, trust it first so the HTTPS page loads cleanly.
+Open the Browser URL in any modern browser on the same host or network and use the direct self-host connect flow.
 EOF
 }
 

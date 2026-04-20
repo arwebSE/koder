@@ -16,7 +16,7 @@ export async function registerServiceWorker(): Promise<void> {
   try {
     await navigator.serviceWorker.register(SW_URL, { scope: "/" });
   } catch {
-    // PWA support stays best-effort for self-hosted installs.
+    // Install-specific browser features stay best-effort for self-hosted usage.
   }
 }
 

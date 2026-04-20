@@ -12,7 +12,7 @@ Koder is a local-first remote client for [Codex](https://openai.com/index/codex/
 
 Be precise about the current state:
 
-- `web/` is the new primary direction and now works as the self-hosted React + Vite + TypeScript PWA client.
+- `web/` is the new primary direction and now works as the self-hosted React + Vite + TypeScript browser client.
 - `bridge/` and `relay/` are the working backend pieces that drive session routing and the local Codex bridge.
 
 That means Koder is now **web-first in both roadmap and active self-hosted usage**.
@@ -36,7 +36,7 @@ See [Docs/KODER_PRODUCT_SPEC.md](Docs/KODER_PRODUCT_SPEC.md) for the current wor
 .
 ├── bridge/          Node bridge package and CLI (`koder`)
 ├── relay/           Self-hostable relay and optional push service
-├── web/             React + Vite + TypeScript PWA client
+├── web/             React + Vite + TypeScript browser client
 ```
 
 ## Quick Start
@@ -56,7 +56,7 @@ That starts:
 - the local web client on port `5173`
 - direct self-host browser access on the same host or IP
 
-Open the printed browser URL on your phone over HTTPS. The launcher serves the PWA on a secure origin and exposes a matching `wss://.../relay` URL through that same origin. The browser attaches directly to the live self-hosted bridge on that host.
+Open the printed browser URL over HTTPS in a modern browser. The launcher serves the web client on a secure origin and exposes a matching `wss://.../relay` URL through that same origin. The browser attaches directly to the live self-hosted bridge on that host. Install behavior and notifications depend on browser support, but the core connect/chat flow does not require a Safari-only path.
 
 ### npm Bridge Install
 
